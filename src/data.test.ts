@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decodeShare, digestSnapshot, encodeShare, quoteStatus, stableSnapshot } from './data';
-import type { Quote, QuoteSnapshot, SharePayload } from './types';
+import { CONSENT_TEXT, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, stableSnapshot, validateBundle, validateDecision } from './data';
+import type { Decision, ExportBundle, Quote, QuoteSnapshot, SharePayload } from './types';
 
 const snapshot: QuoteSnapshot = {
   number: 'Q-2026-001', clientName: 'North & Pine', clientEmail: 'hello@example.com', project: 'Launch site',
@@ -40,5 +40,34 @@ describe('quote state', () => {
     const now = new Date('2026-10-01T00:00:00Z');
     expect(quoteStatus(quote({ sentAt: '2026-08-29T00:00:00Z' }), now)).toBe('expired');
     expect(quoteStatus(quote({ sentAt: '2026-08-29T00:00:00Z', decision: { quoteId: 'q1', version: 1, digest: 'abc', decision: 'accepted', clientName: 'Lee', decidedAt: '2026-09-01T00:00:00Z', consentText: 'yes', note: '' } }), now)).toBe('accepted');
+  });
+});
+
+describe('portable data integrity', () => {
+  const decision = (): Decision => ({
+    quoteId: 'q1', version: 1, digest: 'a'.repeat(64), decision: 'declined', clientName: 'Ada Client',
+    decidedAt: '2026-08-28T12:00:00.000Z', consentText: CONSENT_TEXT, note: 'Not this round.',
+  });
+
+  it('requires exact consent evidence and detects edited decision fields', async () => {
+    const genuine = decision();
+    const receiptDigest = await digestDecision(genuine);
+    await expect(validateDecision({ schema: 2, product: 'quote-decision-log', ...genuine, receiptDigest })).resolves.toMatchObject(genuine);
+    await expect(validateDecision({ schema: 2, product: 'quote-decision-log', ...genuine, consentText: '', receiptDigest })).rejects.toThrow(/consent/i);
+    await expect(validateDecision({ schema: 2, product: 'quote-decision-log', ...genuine, decision: 'accepted', clientName: 'Edited Import', receiptDigest })).rejects.toThrow(/integrity/i);
+  });
+
+  it('rejects a backup with no current version before it reaches storage', async () => {
+    const invalid = { schema: 1, product: 'quote-decision-log', exportedAt: '2026-08-28T12:00:00.000Z', quotes: [{ ...quote(), versions: [] }] };
+    await expect(validateBundle(invalid)).rejects.toThrow(/no quote versions/i);
+  });
+
+  it('accepts a fully valid exported bundle and verifies snapshot fingerprints', async () => {
+    const digest = await digestSnapshot(snapshot);
+    const validQuote = quote({ versions: [{ version: 1, createdAt: '2026-08-28T00:00:00.000Z', digest, snapshot }] });
+    const bundle: ExportBundle = { schema: 1, product: 'quote-decision-log', exportedAt: '2026-08-28T12:00:00.000Z', quotes: [validQuote] };
+    await expect(validateBundle(bundle)).resolves.toEqual(bundle);
+    validQuote.versions[0].snapshot = { ...snapshot, project: 'Changed after export' };
+    await expect(validateBundle(bundle)).rejects.toThrow(/fingerprint/i);
   });
 });

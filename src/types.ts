@@ -35,6 +35,14 @@ export interface Decision {
   decidedAt: string;
   consentText: string;
   note: string;
+  /** SHA-256 of the canonical decision fields, used to detect altered receipts. */
+  receiptDigest?: string;
+}
+
+export interface DecisionReceipt extends Decision {
+  schema: 2;
+  product: 'quote-decision-log';
+  receiptDigest: string;
 }
 
 export interface Quote {

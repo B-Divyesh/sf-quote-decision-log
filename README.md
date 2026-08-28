@@ -39,6 +39,8 @@ origin.
 
 ```sh
 npm test
+npm run typecheck
+npm run lint
 npm run build
 npm run test:e2e
 ```
@@ -56,6 +58,12 @@ trackers, remote fonts, or runtime CDNs. Client links contain the quote in the
 URL fragment; anyone with the link can read it, so send it through an
 appropriate channel. Use the in-app Data and license screen for export, import,
 and deletion.
+
+Decision receipts use schema 2. They include the exact consent text and a
+SHA-256 integrity fingerprint over the quote reference, answer, signer,
+timestamp, consent, and note. Altered or legacy receipts without this evidence
+are rejected; existing decisions in a valid schema-1 full backup remain
+restorable for backward compatibility.
 
 See [`public/privacy/index.html`](public/privacy/index.html) and
 [`public/terms/index.html`](public/terms/index.html).

@@ -103,7 +103,11 @@ input, select, textarea { width: 100%; min-height: 46px; padding: 10px 12px; bor
 textarea { resize: vertical; line-height: 1.5; }
 input:hover, select:hover, textarea:hover { border-color: var(--paper-dim); }
 input:focus, select:focus, textarea:focus { border-color: var(--brass); }
+input:invalid:not(:placeholder-shown), textarea:invalid:not(:placeholder-shown) { border-color: var(--stop); }
 input::placeholder { color: #8fa0a0; }
+.field-error { color: var(--stop); font-size: 13px; line-height: 1.35; font-weight: 650; }
+.field-error[hidden] { display: none; }
+.button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
 .quote-list { content-visibility: auto; }
 .quote-row { display: grid; grid-template-columns: 42px minmax(160px, 1fr) minmax(140px, .45fr) auto 24px; align-items: center; gap: 16px; min-height: 88px; padding: 16px 12px; border-top: 1px solid var(--rule); text-decoration: none; }
 .quote-row:last-of-type { border-bottom: 1px solid var(--rule); }
@@ -182,6 +186,7 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size
 .client-decision fieldset { padding: 0; margin: 24px 0; border: 0; }.client-decision legend { margin-bottom: 8px; font-weight: 800; }.client-decision > label:not(.consent) { margin: 20px 0; }.client-decision .consent { margin-top: 20px; }
 .decision-option { padding: 16px; margin-bottom: 10px; border: 1px solid var(--rule); }.decision-option:has(input:checked) { border-color: var(--brass); background: rgba(214,168,75,.08); }
 .client-footer { padding-inline: 0; }
+.client-footer a { min-width: 44px; min-height: 44px; padding: 10px 4px; display: inline-flex; align-items: center; justify-content: center; }
 
 .settings-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 28px; }.settings-panel hr { border: 0; border-top: 1px solid var(--rule); margin: 36px 0; }.license-panel { border-top: 4px solid var(--brass); }.license-panel form { display: grid; gap: 12px; margin: 24px 0; }.license-panel > .link-button { display: block; margin-top: 12px; }.settings-panel .fine-print a { color: var(--paper); }
 .empty { min-height: 65vh; display: grid; place-content: center; justify-items: center; text-align: center; }.empty.compact { max-width: 680px; margin: 0 auto; }.empty h1 { max-width: 14ch; }.empty p { max-width: 58ch; }.empty .button-row { margin: 20px 0 30px; }

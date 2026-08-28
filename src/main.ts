@@ -1,14 +1,13 @@
 import './styles.css';
 import hero640 from './assets/dispatch-gate-640.webp';
 import hero960 from './assets/dispatch-gate-960.webp';
-import { currentSnapshot, decodeShare, digestSnapshot, encodeShare, quoteStatus, quoteStore, validateBundle, validateDecision } from './data';
+import { CONSENT_TEXT, currentSnapshot, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, quoteStore, validateBundle, validateDecision, validateQuote } from './data';
 import { csvEscape, downloadText } from './download';
 import { captureReturnedLicense, checkoutUrl, clearLicense, isUnlocked, licenseToken, saveLicense, verifyLicense } from './license';
 import type { Decision, ExportBundle, Quote, QuoteSnapshot, SharePayload } from './types';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const FREE_LIMIT = 5;
-const CONSENT = 'I confirm I reviewed this exact quote version and intend to record the decision shown.';
 let quotes: Quote[] = [];
 let storageError = '';
 let toastTimer = 0;
@@ -78,7 +77,7 @@ function setToast(message: string, action?: string): void {
 }
 
 function renderError(title: string, detail: string): void {
-  app.innerHTML = shell(`<section class="empty compact"><span class="station-code">SERVICE NOTICE</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p><button class="button primary" data-retry>Try again</button></section>`);
+  app.innerHTML = shell(`<section class="empty compact"><span class="station-code">SERVICE NOTICE</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p><div class="button-row centered"><button class="button primary" data-retry>Try again</button><a class="button secondary" href="#data">Open data recovery</a></div></section>`);
   document.querySelector('[data-retry]')?.addEventListener('click', () => void boot());
 }
 
@@ -127,8 +126,8 @@ function quoteForm(existing?: Quote): void {
   if (!existing && quotes.length >= FREE_LIMIT && !isUnlocked()) { paywall(); return; }
   app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${existing ? `#quote/${existing.id}` : '#home'}">← Back</a><span class="eyebrow">${existing ? `Version ${existing.currentVersion}` : 'New route'}</span><h1>${existing ? 'Edit quote' : 'Create a quote'}</h1><p>${existing ? 'Saving a changed reviewed quote creates a new version and clears approval.' : 'Capture the commercial promise. You can review it next.'}</p></div></header>
     <form id="quote-form" class="form-panel" novalidate>
-      <div class="form-section"><span class="station-code">IDENTITY</span><h2>Quote and client</h2><div class="field-grid three"><label>Quote number<input name="number" required value="${escapeHtml(snapshot?.number ?? `Q-${new Date().getFullYear()}-${String(quotes.length + 1).padStart(3, '0')}`)}"></label><label>Client name<input name="clientName" autocomplete="organization" required value="${escapeHtml(snapshot?.clientName)}"></label><label>Client email <span>(optional)</span><input name="clientEmail" type="email" autocomplete="email" value="${escapeHtml(snapshot?.clientEmail)}"></label></div></div>
-      <div class="form-section"><span class="station-code">COMMITMENT</span><h2>Work and value</h2><div class="field-grid"><label>Project<input name="project" required value="${escapeHtml(snapshot?.project)}"></label><label>Expiry date<input name="expiresOn" type="date" required value="${escapeHtml(snapshot?.expiresOn ?? today.toISOString().slice(0, 10))}"></label><label>Currency<select name="currency"><option>USD</option><option>EUR</option><option>GBP</option><option>INR</option><option>AUD</option><option>CAD</option></select></label><label>Total amount<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="${snapshot ? (snapshot.totalCents / 100).toFixed(2) : ''}"></label></div><label>Scope and deliverables<textarea name="scope" required rows="7">${escapeHtml(snapshot?.scope)}</textarea></label><label>Terms or assumptions <span>(optional)</span><textarea name="terms" rows="4">${escapeHtml(snapshot?.terms)}</textarea></label></div>
+      <div class="form-section"><span class="station-code">IDENTITY</span><h2>Quote and client</h2><div class="field-grid three"><label>Quote number<input name="number" required aria-describedby="number-error" value="${escapeHtml(snapshot?.number ?? `Q-${new Date().getFullYear()}-${String(quotes.length + 1).padStart(3, '0')}`)}"><span class="field-error" id="number-error" hidden>Enter a quote number, not only spaces.</span></label><label>Client name<input name="clientName" autocomplete="organization" required aria-describedby="clientName-error" value="${escapeHtml(snapshot?.clientName)}"><span class="field-error" id="clientName-error" hidden>Enter a client name, not only spaces.</span></label><label>Client email <span>(optional)</span><input name="clientEmail" type="email" autocomplete="email" value="${escapeHtml(snapshot?.clientEmail)}"></label></div></div>
+      <div class="form-section"><span class="station-code">COMMITMENT</span><h2>Work and value</h2><div class="field-grid"><label>Project<input name="project" required aria-describedby="project-error" value="${escapeHtml(snapshot?.project)}"><span class="field-error" id="project-error" hidden>Enter a project name, not only spaces.</span></label><label>Expiry date<input name="expiresOn" type="date" required value="${escapeHtml(snapshot?.expiresOn ?? today.toISOString().slice(0, 10))}"></label><label>Currency<select name="currency"><option>USD</option><option>EUR</option><option>GBP</option><option>INR</option><option>AUD</option><option>CAD</option></select></label><label>Total amount<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="${snapshot ? (snapshot.totalCents / 100).toFixed(2) : ''}"></label></div><label>Scope and deliverables<textarea name="scope" required rows="7" aria-describedby="scope-error">${escapeHtml(snapshot?.scope)}</textarea><span class="field-error" id="scope-error" hidden>Describe the scope; spaces alone cannot be saved.</span></label><label>Terms or assumptions <span>(optional)</span><textarea name="terms" rows="4">${escapeHtml(snapshot?.terms)}</textarea></label></div>
       <div id="form-error" class="form-error" role="alert" hidden></div><div class="form-actions"><button class="button primary" type="submit">${existing ? 'Save version' : 'Save quote'} ${icon('arrow')}</button><a class="button secondary" href="${existing ? `#quote/${existing.id}` : '#home'}">Cancel</a></div>
     </form>`, existing ? 'home' : 'new');
   const currency = document.querySelector<HTMLSelectElement>('[name="currency"]');
@@ -141,14 +140,23 @@ async function saveQuote(event: SubmitEvent, existing?: Quote): Promise<void> {
   event.preventDefault();
   const form = event.currentTarget as HTMLFormElement;
   const error = document.querySelector<HTMLDivElement>('#form-error')!;
-  if (!form.reportValidity()) return;
+  const requiredText = ['number', 'clientName', 'project', 'scope'];
+  for (const name of requiredText) {
+    const field = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement;
+    const fieldError = document.querySelector<HTMLElement>(`#${name}-error`);
+    const blank = field.value.trim().length === 0;
+    field.setCustomValidity(blank ? fieldError?.textContent ?? 'Enter a value, not only spaces.' : '');
+    if (fieldError) fieldError.hidden = !blank;
+    field.addEventListener('input', () => { field.setCustomValidity(''); if (fieldError) fieldError.hidden = true; }, { once: true });
+  }
+  if (!form.reportValidity()) { error.hidden = false; error.textContent = 'Complete the highlighted fields before saving.'; return; }
   const values = new FormData(form);
   const amount = Number(values.get('amount'));
   if (!Number.isFinite(amount) || amount < 0) { error.hidden = false; error.textContent = 'Enter a valid total amount.'; return; }
   const snapshot: QuoteSnapshot = {
-    number: String(values.get('number')), clientName: String(values.get('clientName')), clientEmail: String(values.get('clientEmail')),
-    project: String(values.get('project')), currency: String(values.get('currency')), totalCents: Math.round(amount * 100),
-    expiresOn: String(values.get('expiresOn')), scope: String(values.get('scope')), terms: String(values.get('terms')),
+    number: String(values.get('number')).trim(), clientName: String(values.get('clientName')).trim(), clientEmail: String(values.get('clientEmail')).trim(),
+    project: String(values.get('project')).trim(), currency: String(values.get('currency')), totalCents: Math.round(amount * 100),
+    expiresOn: String(values.get('expiresOn')), scope: String(values.get('scope')).trim(), terms: String(values.get('terms')).trim(),
   };
   try {
     const digest = await digestSnapshot(snapshot);
@@ -189,7 +197,7 @@ function quoteDetail(quote: Quote): void {
   document.querySelector('[data-open-share]')?.addEventListener('click', () => void shareScreen(quote));
   document.querySelector('[data-import-receipt]')?.addEventListener('click', () => document.querySelector<HTMLInputElement>('#receipt-file')?.click());
   document.querySelector<HTMLInputElement>('#receipt-file')?.addEventListener('change', (event) => void importReceiptFile(event));
-  document.querySelector('[data-export-receipt]')?.addEventListener('click', () => quote.decision && exportReceipt(quote.decision, snapshot.number));
+  document.querySelector('[data-export-receipt]')?.addEventListener('click', () => { if (quote.decision) void exportReceipt(quote.decision, snapshot.number); });
   document.querySelector('[data-delete-quote]')?.addEventListener('click', () => void deleteQuote(quote));
   bindShared();
 }
@@ -218,6 +226,8 @@ function reviewScreen(quote: Quote): void {
 async function approveQuote(event: SubmitEvent, quote: Quote): Promise<void> {
   event.preventDefault();
   const form = event.currentTarget as HTMLFormElement;
+  const reviewer = form.elements.namedItem('reviewer') as HTMLInputElement;
+  reviewer.setCustomValidity(reviewer.value.trim().length < 2 ? 'Enter at least two non-space characters.' : '');
   if (!form.reportValidity()) return;
   const values = new FormData(form);
   quote.review = { version: quote.currentVersion, reviewer: String(values.get('reviewer')).trim(), reviewedAt: new Date().toISOString(), checks: values.getAll('checks').map(String) };
@@ -270,10 +280,10 @@ async function clientPage(encoded: string): Promise<void> {
       ${expired ? '<div class="notice danger-notice"><b>This quote has expired.</b> You can review it, but a new decision cannot be recorded. Ask the sender for an updated quote.</div>' : ''}
       <section><h2>Scope and deliverables</h2><p>${escapeHtml(snapshot.scope).replaceAll('\n', '<br>')}</p>${snapshot.terms ? `<h2>Terms and assumptions</h2><p>${escapeHtml(snapshot.terms).replaceAll('\n', '<br>')}</p>` : ''}</section>
     </article>
-    ${existingDecision ? `<section class="client-decision">${decisionPanel(existingDecision)}<button class="button secondary" data-export-client-receipt>${icon('download')} Download receipt again</button></section>` : expired ? '' : `<form id="decision-form" class="client-decision"><span class="station-code">YOUR DECISION</span><h2>Record a clear answer</h2><p>This creates a portable receipt for you to return to the sender. Your entry stays on this device unless you share the downloaded file.</p><fieldset><legend>Choose one</legend><label class="decision-option accept"><input type="radio" name="decision" value="accepted" required><span><b>Accept this quote</b>I intend to proceed on this exact version.</span></label><label class="decision-option decline"><input type="radio" name="decision" value="declined"><span><b>Decline this quote</b>I do not intend to proceed on this version.</span></label></fieldset><label>Your full name<input name="clientName" autocomplete="name" required minlength="2"></label><label>Note <span>(optional)</span><textarea name="note" rows="3" maxlength="500"></textarea></label><label class="consent"><input type="checkbox" name="consent" required><span>${CONSENT}</span></label><p class="fine-print">This is an audit record of explicit consent, not a claim of a regulated electronic signature.</p><button class="button primary wide" type="submit">Record decision</button></form>`}
+    ${existingDecision ? `<section class="client-decision">${decisionPanel(existingDecision)}<button class="button secondary" data-export-client-receipt>${icon('download')} Download receipt again</button></section>` : expired ? '' : `<form id="decision-form" class="client-decision"><span class="station-code">YOUR DECISION</span><h2>Record a clear answer</h2><p>This creates a portable receipt for you to return to the sender. Your entry stays on this device unless you share the downloaded file.</p><fieldset><legend>Choose one</legend><label class="decision-option accept"><input type="radio" name="decision" value="accepted" required><span><b>Accept this quote</b>I intend to proceed on this exact version.</span></label><label class="decision-option decline"><input type="radio" name="decision" value="declined"><span><b>Decline this quote</b>I do not intend to proceed on this version.</span></label></fieldset><label>Your full name<input name="clientName" autocomplete="name" required minlength="2"></label><label>Note <span>(optional)</span><textarea name="note" rows="3" maxlength="500"></textarea></label><label class="consent"><input type="checkbox" name="consent" required><span>${CONSENT_TEXT}</span></label><p class="fine-print">This is an audit record of explicit consent, not a claim of a regulated electronic signature.</p><button class="button primary wide" type="submit">Record decision</button></form>`}
     <footer class="client-footer"><span>Quote details are carried in this private link; they are not uploaded by Quote Decision.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span></footer><div id="live" class="sr-only" aria-live="polite"></div><div id="toast" class="toast" role="status" hidden></div></main>`;
   document.querySelector<HTMLFormElement>('#decision-form')?.addEventListener('submit', (event) => void recordClientDecision(event, payload));
-  document.querySelector('[data-export-client-receipt]')?.addEventListener('click', () => existingDecision && exportReceipt(existingDecision, snapshot.number));
+  document.querySelector('[data-export-client-receipt]')?.addEventListener('click', () => { if (existingDecision) void exportReceipt(existingDecision, snapshot.number); });
 }
 
 async function recordClientDecision(event: SubmitEvent, payload: SharePayload): Promise<void> {
@@ -281,20 +291,26 @@ async function recordClientDecision(event: SubmitEvent, payload: SharePayload): 
   const form = event.currentTarget as HTMLFormElement;
   if (!form.reportValidity()) return;
   const values = new FormData(form);
-  const decision: Decision = { quoteId: payload.quoteId, version: payload.version, digest: payload.digest, decision: String(values.get('decision')) as Decision['decision'], clientName: String(values.get('clientName')).trim(), decidedAt: new Date().toISOString(), consentText: CONSENT, note: String(values.get('note')).trim() };
+  const clientName = String(values.get('clientName')).trim();
+  const nameField = form.elements.namedItem('clientName') as HTMLInputElement;
+  nameField.setCustomValidity(clientName.length < 2 ? 'Enter at least two non-space characters.' : '');
+  if (!form.reportValidity()) return;
+  const decision: Decision = { quoteId: payload.quoteId, version: payload.version, digest: payload.digest, decision: String(values.get('decision')) as Decision['decision'], clientName, decidedAt: new Date().toISOString(), consentText: CONSENT_TEXT, note: String(values.get('note')).trim() };
+  decision.receiptDigest = await digestDecision(decision);
   const local = await quoteStore.get(payload.quoteId).catch(() => undefined);
   if (local && local.versions.some((version) => version.version === payload.version && version.digest === payload.digest)) {
     if (local.currentVersion === payload.version) local.decision = decision;
     else local.decisionHistory = [...(local.decisionHistory ?? []), decision];
     local.updatedAt = decision.decidedAt; await quoteStore.put(local); await refreshQuotes();
   }
-  exportReceipt(decision, payload.snapshot.number);
+  await exportReceipt(decision, payload.snapshot.number);
   await clientPage(encodeShare(payload));
   setToast('Decision recorded. Return the downloaded receipt to the sender.');
 }
 
-function exportReceipt(decision: Decision, quoteNumber: string): void {
-  downloadText(`decision-${quoteNumber.replace(/[^a-z0-9-]/gi, '_')}-v${decision.version}.json`, JSON.stringify({ schema: 1, product: 'quote-decision-log', ...decision }, null, 2));
+async function exportReceipt(decision: Decision, quoteNumber: string): Promise<void> {
+  const receiptDigest = decision.receiptDigest ?? await digestDecision(decision);
+  downloadText(`decision-${quoteNumber.replace(/[^a-z0-9-]/gi, '_')}-v${decision.version}.json`, JSON.stringify({ schema: 2, product: 'quote-decision-log', ...decision, receiptDigest }, null, 2));
 }
 
 async function importReceiptFile(event: Event): Promise<void> {
@@ -302,15 +318,19 @@ async function importReceiptFile(event: Event): Promise<void> {
   const file = input.files?.[0];
   if (!file) return;
   try {
-    const decision = validateDecision(JSON.parse(await file.text()));
+    const decision = await validateDecision(JSON.parse(await file.text()));
     const quote = await quoteStore.get(decision.quoteId);
     const version = quote?.versions.find((item) => item.version === decision.version);
     if (!quote || !version) throw new Error('This receipt belongs to a quote that is not in this log.');
     if (version.digest !== decision.digest) throw new Error('The receipt fingerprint does not match the saved quote version.');
+    const prior = quote.currentVersion === decision.version ? quote.decision : quote.decisionHistory?.find((item) => item.version === decision.version);
+    if (prior && await digestDecision(prior) !== await digestDecision(decision)) {
+      throw new Error('This version already has a different client decision. The saved audit record was not replaced.');
+    }
     if (quote.currentVersion === decision.version) quote.decision = decision;
-    else quote.decisionHistory = [...(quote.decisionHistory ?? []), decision];
+    else if (!prior) quote.decisionHistory = [...(quote.decisionHistory ?? []), decision];
     quote.updatedAt = new Date().toISOString();
-    await quoteStore.put(quote); await refreshQuotes(); location.hash = `quote/${quote.id}`; setToast(`Client decision imported: ${decision.decision}.`);
+    await quoteStore.put(quote); await refreshQuotes(); location.hash = `quote/${quote.id}`; quoteDetail(quote); setToast(`Client decision imported: ${decision.decision}.`);
   } catch (caught) { setToast(caught instanceof Error ? caught.message : 'The receipt could not be imported.'); }
   input.value = '';
 }
@@ -324,7 +344,7 @@ async function deleteQuote(quote: Quote): Promise<void> {
 function dataPage(): void {
   const unlocked = isUnlocked();
   app.innerHTML = shell(`<header class="page-head"><div><span class="eyebrow">Ownership & access</span><h1>Data and license</h1><p>Back up the whole log, move decisions between devices, or remove everything.</p></div></header>
-    <div class="settings-grid"><section class="settings-panel"><span class="station-code">YOUR DATA</span><h2>Portable by design</h2><p>Quotes live in this browser’s IndexedDB. Export a JSON backup for restoration or a CSV overview for your records.</p><div class="button-row"><button class="button primary" data-export-json>${icon('download')} Export JSON</button><button class="button secondary" data-export-csv>Export CSV</button><button class="button secondary" data-import-backup>Import backup</button></div><input id="backup-file" type="file" accept="application/json,.json" hidden><hr><h3>Delete local data</h3><p>Removes all ${quotes.length} quote${quotes.length === 1 ? '' : 's'} from this device. Export first if you might need them.</p><button class="button danger" data-delete-all>Delete all quotes</button></section>
+    <div class="settings-grid"><section class="settings-panel"><span class="station-code">YOUR DATA</span><h2>Portable by design</h2><p>Quotes live in this browser’s IndexedDB. Export a JSON backup for restoration or a CSV overview for your records.</p>${storageError ? `<div class="notice" role="alert"><b>Local data needs recovery.</b><p>${escapeHtml(storageError)} Import a valid backup to replace it, or delete the invalid local data below.</p></div>` : ''}<div class="button-row"><button class="button primary" data-export-json ${storageError ? 'disabled' : ''}>${icon('download')} Export JSON</button><button class="button secondary" data-export-csv ${storageError ? 'disabled' : ''}>Export CSV</button><button class="button secondary" data-import-backup>Import backup</button></div><input id="backup-file" type="file" accept="application/json,.json" hidden><hr><h3>Delete local data</h3><p>${storageError ? 'Removes the unreadable local quote data from this device.' : `Removes all ${quotes.length} quote${quotes.length === 1 ? '' : 's'} from this device. Export first if you might need them.`}</p><button class="button danger" data-delete-all>${storageError ? 'Delete invalid local data' : 'Delete all quotes'}</button></section>
       <section class="settings-panel license-panel"><span class="station-code">ONE-TIME UNLOCK</span><h2>${unlocked ? 'Unlimited is active' : 'Keep every quote moving'}</h2><p>${unlocked ? 'This device has a valid cached license. Thank you for supporting a focused, private tool.' : `The free edition handles ${FREE_LIMIT} active quotes end to end. A $19 one-time purchase unlocks unlimited quotes and future v1 updates—no subscription.`}</p>${unlocked ? `<button class="button secondary" data-verify-license>Verify license now</button><button class="link-button danger-link" data-remove-license>Remove from this device</button>` : `<a class="button primary" href="${checkoutUrl}">Buy unlimited — $19</a><form id="license-form"><label>Have a license? Paste it here<input name="license" autocomplete="off" required></label><button class="button secondary" type="submit">Restore purchase</button></form>`}<p class="fine-print">Checkout is hosted by Sociobot. Dodo is the merchant of record; refunds are handled there and revoke the license. <a href="/terms/">Terms</a> apply.</p><div id="license-status" role="status"></div></section></div>`, 'data');
   document.querySelector('[data-export-json]')?.addEventListener('click', exportJson);
   document.querySelector('[data-export-csv]')?.addEventListener('click', exportCsv);
@@ -352,14 +372,15 @@ function exportCsv(): void {
 
 async function importBackup(event: Event): Promise<void> {
   const file = (event.currentTarget as HTMLInputElement).files?.[0]; if (!file) return;
-  try { const bundle = validateBundle(JSON.parse(await file.text())); for (const quote of bundle.quotes) await quoteStore.put(quote); await refreshQuotes(); dataPage(); setToast(`${bundle.quotes.length} quote${bundle.quotes.length === 1 ? '' : 's'} imported.`); }
+  try { const bundle = await validateBundle(JSON.parse(await file.text())); if (storageError) await quoteStore.clear(); for (const quote of bundle.quotes) await quoteStore.put(quote); storageError = ''; await refreshQuotes(); dataPage(); setToast(`${bundle.quotes.length} quote${bundle.quotes.length === 1 ? '' : 's'} imported.`); }
   catch (caught) { setToast(caught instanceof Error ? caught.message : 'The backup could not be imported.'); }
 }
 
 async function deleteAll(): Promise<void> {
-  if (!quotes.length) { setToast('There are no quotes to delete.'); return; }
-  if (!confirm(`Delete all ${quotes.length} quotes from this device? This cannot be undone unless you exported a backup.`)) return;
-  await quoteStore.clear(); await refreshQuotes(); dataPage(); setToast('All local quotes deleted.');
+  if (!quotes.length && !storageError) { setToast('There are no quotes to delete.'); return; }
+  const prompt = storageError ? 'Delete all invalid local quote data from this device? This cannot be undone.' : `Delete all ${quotes.length} quotes from this device? This cannot be undone unless you exported a backup.`;
+  if (!confirm(prompt)) return;
+  await quoteStore.clear(); storageError = ''; await refreshQuotes(); dataPage(); setToast('All local quotes deleted.');
 }
 
 async function restoreLicense(event: SubmitEvent): Promise<void> {
@@ -395,7 +416,7 @@ function updateNetworkState(): void {
 }
 
 async function refreshQuotes(): Promise<void> {
-  quotes = await quoteStore.all();
+  quotes = (await quoteStore.all()).map((quote, index) => validateQuote(quote, `Stored quote ${index + 1}`));
 }
 
 function route(): void {
