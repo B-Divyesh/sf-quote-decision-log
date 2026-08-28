@@ -20,9 +20,11 @@ async function ensureServiceWorkerControl(page: Page): Promise<void> {
   await page.waitForFunction(() => navigator.serviceWorker?.controller != null);
 }
 
-test('creates, reviews, sends, and records a client decision', async ({ page }, testInfo) => {
+test('creates, reviews, sends, and records a client decision', async ({ page, context }, testInfo) => {
   const pageErrors: string[] = [];
+  const requestUrls: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('request', (request) => requestUrls.push(request.url()));
   await page.getByRole('link', { name: /create your first quote/i }).click();
   await page.getByLabel('Client name').fill('North & Pine');
   await page.getByLabel('Client email').fill('hello@example.com');
@@ -44,6 +46,9 @@ test('creates, reviews, sends, and records a client decision', async ({ page }, 
   const link = await page.getByLabel('Private decision link').inputValue();
   await page.goto(link);
   await expect(page.getByText('Fingerprint verified')).toBeVisible();
+  expect(requestUrls.every((url) => new URL(url).origin === new URL(link).origin)).toBe(true);
+  expect(requestUrls.some((url) => url.includes('#client/') || url.includes('North%20%26%20Pine'))).toBe(false);
+  expect(await context.cookies()).toEqual([]);
   if (testInfo.project.name === 'mobile') {
     for (const legalLink of await page.locator('.client-footer a').all()) {
       const box = await legalLink.boundingBox();
@@ -72,6 +77,17 @@ test('has no serious accessibility findings on the empty state', async ({ page }
   await expect(page.locator('main')).toHaveCount(1);
 });
 
+test('has no serious accessibility findings on form, data, and legal screens', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The mobile client screen is scanned in the lifecycle test.');
+  for (const path of ['/#new', '/#data', '/privacy/', '/terms/']) {
+    await page.goto(path);
+    const results = await new AxeBuilder({ page: page as never }).analyze();
+    expect(results.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')), path).toEqual([]);
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('main')).toHaveCount(1);
+  }
+});
+
 test('supports the core review checkpoint with keyboard controls', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'Keyboard workflow is viewport-independent and exercised once.');
   await page.getByRole('link', { name: 'Skip to main content' }).focus();
@@ -80,12 +96,16 @@ test('supports the core review checkpoint with keyboard controls', async ({ page
 
   await page.getByRole('link', { name: /create your first quote/i }).focus();
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Create a quote' })).toBeVisible();
+  await expect(page.locator('main')).toBeFocused();
   for (const [label, value] of [['Client name', 'Keyboard Co'], ['Project', 'Keyboard route'], ['Total amount', '850'], ['Scope and deliverables', 'Keyboard-only workflow.']] as const) {
     await page.getByLabel(label).focus();
     await page.keyboard.type(value);
   }
   await page.getByRole('button', { name: /save quote/i }).focus();
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Keyboard route', level: 1 })).toBeVisible();
+  await expect(page.locator('main')).toBeFocused();
   await page.getByRole('button', { name: /review quote/i }).focus();
   await page.keyboard.press('Enter');
   for (const checkbox of await page.getByRole('checkbox').all()) {
