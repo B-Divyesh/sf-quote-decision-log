@@ -1,0 +1,30 @@
+{
+  "slug": "quote-decision-log",
+  "title": "Quote Decision",
+  "territory": "utilities",
+  "user": "Tiny agencies that need an internal approval checkpoint and a clear client decision trail for quotes before anyone sends or starts work.",
+  "evidence": [
+    {
+      "url": "https://hn.algolia.com/api/v1/items/45144422",
+      "date": "2025-09-05",
+      "quote_or_summary": "A freelancer explicitly asks what invoicing features matter and what current tools get wrong or overcomplicate in real workflows."
+    },
+    {
+      "url": "https://github.com/invoiceninja/invoiceninja/issues/12207",
+      "date": "2026-08-24",
+      "quote_or_summary": "A self-hosted Invoice Ninja user requests an approve-and-send/deny-sending workflow for draft quotes and invoices based on staff permissions."
+    }
+  ],
+  "recurrence": "Current requests in 2025 and 2026 show that quote workflow is more than document generation; a missed review can become unprofitable committed work.",
+  "current_workaround": "Slack/email sign-off, a shared spreadsheet column, and manually forwarding a PDF to the client.",
+  "incumbents_and_gap": "PandaDoc, Qwilr, and Invoice Ninja offer document workflows, but are heavy for a two-person shop that only needs review, send, accept/decline, and a clean record.",
+  "smallest_useful_product": "Local quote checklist with one reviewer, send-ready status, accept/decline page, expiry date, and signed decision export. Non-goals: e-signature compliance claims, payments, or document editor.",
+  "success_measure": "At least 90% of pilot quotes have both a pre-send review status and a recorded client decision within 30 days.",
+  "artifact_class": "pwa-offline",
+  "monetization": "one-time — it replaces a small but high-consequence coordination ritual without requiring hosted accounts.",
+  "constraints": "Use explicit consent and preserve the exact accepted version; no legal claim that a click is a regulated signature; expose a data-export/delete control.",
+  "est_build_effort": "S",
+  "why_distinct": "The value is a decision audit for very small teams, not prettier quote templates.",
+  "confidence": 4,
+  "state": "BUILT"
+}

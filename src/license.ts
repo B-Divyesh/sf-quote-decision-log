@@ -1,7 +1,9 @@
 const SLUG = 'quote-decision-log';
 const KEY = `sb_license:${SLUG}`;
 const VERDICT_KEY = `${KEY}:verdict`;
-const API = 'https://api.sociobot.in/api/v1';
+const API = location.hostname === 'quote-decision-log.sociobot.in'
+  ? 'https://api.sociobot.in/api/v1'
+  : 'https://pilot-api.sociobot.in/api/v1';
 
 interface CachedVerdict { valid: boolean; checkedAt: number }
 

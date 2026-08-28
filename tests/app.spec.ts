@@ -11,6 +11,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('creates, reviews, sends, and records a client decision', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.getByRole('link', { name: /create your first quote/i }).click();
   await page.getByLabel('Client name').fill('North & Pine');
   await page.getByLabel('Client email').fill('hello@example.com');
@@ -32,6 +34,8 @@ test('creates, reviews, sends, and records a client decision', async ({ page }) 
   const link = await page.getByLabel('Private decision link').inputValue();
   await page.goto(link);
   await expect(page.getByText('Fingerprint verified')).toBeVisible();
+  const clientA11y = await new AxeBuilder({ page: page as never }).analyze();
+  expect(clientA11y.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? ''))).toEqual([]);
   await page.getByText('Accept this quote').click();
   await page.getByLabel('Your full name').fill('Ada Client');
   await page.getByText(/I confirm I reviewed/).click();
@@ -39,6 +43,7 @@ test('creates, reviews, sends, and records a client decision', async ({ page }) 
   await page.getByRole('button', { name: 'Record decision' }).click();
   expect((await download).suggestedFilename()).toContain('decision-');
   await expect(page.getByRole('heading', { name: /Accepted by Ada Client/i })).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });
 
 test('has no serious accessibility findings on the empty state', async ({ page }) => {
@@ -63,4 +68,16 @@ test('retains the loaded app while offline', async ({ page, context }, testInfo)
   await page.goto('/#home');
   await expect(page.locator('.offline-banner')).toBeVisible();
   await expect(page.getByRole('link', { name: /create your first quote/i })).toBeVisible();
+});
+
+test('stores a returned one-time license and verifies the unlock', async ({ page }) => {
+  await page.route('https://pilot-api.sociobot.in/api/v1/products/quote-decision-log/verify**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null }),
+  }));
+  await page.goto('/?license=test-license-token#data');
+  await expect(page.getByRole('heading', { name: 'Unlimited is active' })).toBeVisible();
+  expect(new URL(page.url()).searchParams.has('license')).toBe(false);
+  expect(await page.evaluate(() => localStorage.getItem('sb_license:quote-decision-log'))).toBe('test-license-token');
 });
