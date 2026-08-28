@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Quote Decision mark">
+  <rect width="512" height="512" fill="#101a1d"/>
+  <path fill="#d6a84b" d="M72 44h368v36H72zm0 388h368v36H72zM44 72h36v368H44zm388 0h36v368h-36z"/>
+  <circle cx="256" cy="256" r="143" fill="none" stroke="#5fb2ba" stroke-width="34"/>
+  <path fill="none" stroke="#f4e9cf" stroke-width="42" stroke-linecap="square" stroke-linejoin="miter" d="m165 260 61 61 126-139"/>
+  <path fill="#d6a84b" d="M238 62h36v66h-36zm0 322h36v66h-36z"/>
+</svg>
