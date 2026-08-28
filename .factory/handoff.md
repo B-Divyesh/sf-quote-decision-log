@@ -1,45 +1,45 @@
-# Quote Decision — verification handoff
+# Quote Decision — independent verification handoff
 
 ## Result: FAIL
 
-Independent verification on 2026-08-28 tested candidate
-`8972f8af4ac359220981b050c13b98aed58bd425` and production
-<https://quote-decision-log.sociobot.in>. All 16 built artifacts match production
-byte-for-byte, so the result is not caused by a stale deployment.
+Candidate `8972f8af4ac359220981b050c13b98aed58bd425` was independently
+verified on 2026-08-28 against
+<https://quote-decision-log.sociobot.in>. All 16 fresh production-build files
+match the live deployment byte-for-byte, so this is not a stale-deployment
+result.
 
-Full evidence and reproduction details are in
+Full continuation evidence is in
+[`.factory/verification-1.md`](verification-1.md); the first report remains in
 [`.factory/verification.md`](verification.md).
 
-## What passed
+## Release blockers
 
-- Clean `npm ci`, 5/5 unit tests, strict TypeScript production build, and
-  Playwright: 7 passed / 1 intentional project skip.
-- Core create/review/version/send/client-decision/export/delete workflow,
-  refresh persistence, expiry boundary, five-quote boundary, invalid-field
-  handling, keyboard-only operation, and reduced motion.
-- PWA installability, controlled offline reload, and an isolated service-worker
-  waiting/update/activation cycle.
-- Anonymous privacy check: same-origin requests only, no cookies, no tracking;
-  client URL fragments were absent from requests.
-- Axe serious/critical: 0 on settled representative screens. Lighthouse mobile
-  across three runs: performance 92/100/99, accessibility 100, best practices
-  100, SEO 100; LCP 1.20–1.28 s, CLS 0. Bundles are within budget.
+1. **HIGH — checkout unavailable:** the advertised $19 production checkout
+   returns HTTP 404 `{"error":"enabled factory product","status":404}`.
+2. **HIGH — consent/decision validation:** a matching-version receipt without
+   `consentText` and with changed answer/signer fields is accepted and shown.
+3. **HIGH — backup validation:** a quote with `versions: []` imports as
+   successful, then the log raises `Cannot read properties of undefined
+   (reading 'snapshot')`.
 
-## Release-blocking findings
+Also open: receipt import needs reload to update the view (medium), whitespace
+required data is accepted (medium), mobile legal links are 15 px high (medium),
+hashed assets use 30-second revalidation (low), and CSP, Permissions-Policy,
+and manifest MIME need hardening (low).
 
-1. **HIGH — live checkout unavailable:** the advertised production Sociobot
-   checkout returns HTTP 404 `{"error":"enabled factory product","status":404}`.
-2. **HIGH — decision consent/integrity validation:** a receipt retaining the
-   quote fingerprint but missing `consentText` and containing edited
-   decision/signer fields is accepted and replaces the genuine decision.
-3. **HIGH — unsafe backup validation:** a quote with an empty versions array is
-   imported, after which the dashboard raises `Cannot read properties of
-   undefined (reading 'snapshot')`.
+## Verified passes
 
-Also recorded: valid receipt import needs a reload to appear (medium),
-whitespace-only required text is accepted (medium), client legal links are only
-15 px high at 390 px (medium), hashed assets have 30-second caching (low), and
-CSP/Permissions-Policy plus the manifest MIME need hardening (low).
+- Detached clean checkout: `npm ci`, 5/5 unit tests, strict TypeScript/Vite
+  build, and Playwright 7 passed / 1 intentional duplicate skip.
+- Representative create/review/version/send/client-decision/export/delete,
+  expiry/free-limit boundaries, persistence, keyboard, focus, reduced motion,
+  and invalid-input recovery.
+- PWA installability, service-worker update path, offline reload, and IndexedDB
+  persistence.
+- Anonymous same-origin/no-cookie behavior, no tracking, and client payloads
+  absent from requests.
+- Axe serious/critical: 0. Fresh Lighthouse mobile: performance 100/99/99 and
+  accessibility/best-practices/SEO 100; LCP 1.13–1.31 s, CLS 0. Bundles pass.
 
 ## Reverification
 
@@ -50,8 +50,7 @@ npm run build
 npm run test:e2e
 ```
 
-Then verify production checkout registration, edited/missing-consent receipt
-rejection, deep backup schema validation and recovery, immediate receipt-view
-refresh, mobile target sizes, headers, and offline/update behavior. No product
-code was changed during this verification; only this handoff and the verification
-report were added/updated.
+Then recheck checkout registration, receipt consent validation, deep backup
+validation/recovery, immediate receipt-view refresh, 390 px targets, production
+headers/caching, and PWA offline/update behavior. Verification changed no
+product code.
