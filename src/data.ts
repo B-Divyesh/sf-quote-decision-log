@@ -2,8 +2,12 @@ import type { Decision, DecisionReceipt, ExportBundle, Quote, QuoteSnapshot, Quo
 
 const REAL_DB_NAME = 'quote-decision-log';
 const DEMO_DB_NAME = 'demo:quote-decision-log';
+const REAL_CLIENT_DB_NAME = 'quote-decision-client-receipts';
+const DEMO_CLIENT_DB_NAME = 'demo:quote-decision-client-receipts';
 const STORE = 'quotes';
+const CLIENT_STORE = 'receipts';
 let databaseName = REAL_DB_NAME;
+let clientDatabaseName = REAL_CLIENT_DB_NAME;
 export const CONSENT_TEXT = 'I confirm I reviewed this exact quote version and intend to record the decision shown.';
 const SHA256 = /^[a-f0-9]{64}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -121,6 +125,7 @@ function openDatabase(): Promise<IDBDatabase> {
  */
 export function useDemoQuoteStorage(demo: boolean): void {
   databaseName = demo ? DEMO_DB_NAME : REAL_DB_NAME;
+  clientDatabaseName = demo ? DEMO_CLIENT_DB_NAME : REAL_CLIENT_DB_NAME;
 }
 
 export function activeQuoteStorageName(): string {
@@ -157,6 +162,65 @@ export const quoteStore = {
   },
   clear(): Promise<undefined> {
     return withStore<undefined>('readwrite', (store) => store.clear());
+  },
+};
+
+function clientReceiptKey(decision: Pick<Decision, 'quoteId' | 'version' | 'digest'>): string {
+  return `${decision.quoteId}:${decision.version}:${decision.digest}`;
+}
+
+function openClientDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('This browser does not provide local storage. Try a current browser.'));
+      return;
+    }
+    const request = indexedDB.open(clientDatabaseName, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(CLIENT_STORE)) db.createObjectStore(CLIENT_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(new Error('This client receipt could not be stored on the device.'));
+  });
+}
+
+async function withClientReceiptStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
+  const db = await openClientDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(CLIENT_STORE, mode);
+    const request = run(transaction.objectStore(CLIENT_STORE));
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(new Error('This client receipt could not be stored on the device.'));
+    transaction.oncomplete = () => db.close();
+  });
+}
+
+export const clientReceiptStore = {
+  async get(reference: Pick<Decision, 'quoteId' | 'version' | 'digest'>): Promise<DecisionReceipt | undefined> {
+    const receipt = await withClientReceiptStore<DecisionReceipt | undefined>('readonly', (store) => store.get(clientReceiptKey(reference)));
+    if (!receipt) return undefined;
+    const valid = await validateDecision(receipt);
+    if (valid.quoteId !== reference.quoteId || valid.version !== reference.version || valid.digest !== reference.digest) {
+      throw new Error('The saved client receipt does not match this quote link.');
+    }
+    return valid;
+  },
+  async put(decision: Decision): Promise<void> {
+    const receipt: DecisionReceipt = {
+      schema: 2,
+      product: 'quote-decision-log',
+      ...decision,
+      receiptDigest: decision.receiptDigest ?? await digestDecision(decision),
+    };
+    await validateDecision(receipt);
+    await withClientReceiptStore<IDBValidKey>('readwrite', (store) => store.put(receipt, clientReceiptKey(receipt)));
+  },
+  remove(reference: Pick<Decision, 'quoteId' | 'version' | 'digest'>): Promise<undefined> {
+    return withClientReceiptStore<undefined>('readwrite', (store) => store.delete(clientReceiptKey(reference)));
+  },
+  clear(): Promise<undefined> {
+    return withClientReceiptStore<undefined>('readwrite', (store) => store.clear());
   },
 };
 

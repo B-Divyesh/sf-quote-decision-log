@@ -103,6 +103,8 @@ test('@claim:client-link keeps the sample quote in a URL fragment', async ({ pag
   const link = await page.getByLabel('Private decision link').inputValue();
   expect(new URL(link).hash).toMatch(/^#client\//);
   expect(new URL(link).hash).toContain('client/');
+  await expect(page.getByText('This link carries the quote itself. Send it through your own email or message.')).toBeVisible();
+  await expect(page.getByText(/No account or network request is needed/i)).toHaveCount(0);
 });
 
 test('@claim:decision-receipt exports the accepted sample decision receipt', async ({ page }, testInfo) => {

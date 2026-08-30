@@ -11,8 +11,10 @@ The demo starts with two realistic sample quotes:
 - `QD-2048` for Harrow & Vale, ready for an agency review before it is sent.
 
 The demo stores its quotes in the browser's `demo:quote-decision-log`
-IndexedDB database. The normal product uses `quote-decision-log`; demo mode
-does not read or write it. The visible **Demo — sample data, nothing is saved**
+IndexedDB database and client receipts in
+`demo:quote-decision-client-receipts`. The normal product uses
+`quote-decision-log` and `quote-decision-client-receipts`; demo mode does not
+read or write them. The visible **Demo — sample data, nothing is saved**
 banner has **Reset demo** to restore the two samples and **Start for real** to
 leave the sandbox. Leaving the demo discards no real data; its separate demo
 data remains available only until the next reset or browser-site-data cleanup.

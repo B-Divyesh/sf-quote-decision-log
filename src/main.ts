@@ -1,7 +1,7 @@
 import './styles.css';
 import hero640 from './assets/dispatch-gate-640.webp';
 import hero960 from './assets/dispatch-gate-960.webp';
-import { CONSENT_TEXT, currentSnapshot, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, quoteStore, useDemoQuoteStorage, validateBundle, validateDecision, validateQuote } from './data';
+import { clientReceiptStore, CONSENT_TEXT, currentSnapshot, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, quoteStore, useDemoQuoteStorage, validateBundle, validateDecision, validateQuote } from './data';
 import { csvEscape, downloadText } from './download';
 import { captureReturnedLicense, checkoutUrl, clearLicense, isUnlocked, licenseToken, saveLicense, verifyLicense } from './license';
 import type { Decision, ExportBundle, Quote, QuoteSnapshot, SharePayload } from './types';
@@ -106,7 +106,7 @@ function shell(content: string, section = 'home'): string {
     </header>
     <div id="offline-banner" class="offline-banner" ${navigator.onLine ? 'hidden' : ''}>Offline — changes stay here on this device.</div>
     <main id="main" tabindex="-1">${demoMode ? '<aside class="demo-banner" aria-label="Demo mode"><span><b>Demo</b> — sample data, nothing is saved.</span><button type="button" data-reset-demo>Reset demo</button><a href="/">Start for real</a></aside>' : ''}${content}</main>
-    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.1</span></footer>
+    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.2</span></footer>
     <div id="live" class="sr-only" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
   </div>`;
@@ -305,7 +305,7 @@ async function shareScreen(quote: Quote): Promise<void> {
   const version = quote.versions.find((item) => item.version === quote.currentVersion)!;
   const payload: SharePayload = { schema: 1, quoteId: quote.id, version: version.version, digest: version.digest, issuedAt: new Date().toISOString(), snapshot: version.snapshot };
   const url = `${location.origin}${location.pathname}#client/${encodeShare(payload)}`;
-  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${appPath(`quote/${quote.id}`)}">← Quote ${escapeHtml(version.snapshot.number)}</a><span class="eyebrow">Dispatch · Version ${quote.currentVersion}</span><h1>Send the reviewed version</h1><p>This link carries the quote itself. No account or network request is needed to read it.</p></div></header>${workflow(quote.sentAt ? 2 : 1)}
+  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${appPath(`quote/${quote.id}`)}">← Quote ${escapeHtml(version.snapshot.number)}</a><span class="eyebrow">Dispatch · Version ${quote.currentVersion}</span><h1>Send the reviewed version</h1><p>This link carries the quote itself. Send it through your own email or message.</p></div></header>${workflow(quote.sentAt ? 2 : 1)}
     <section class="share-panel"><div class="share-copy"><span class="station-code">CLIENT LINK</span><h2>Ready for ${escapeHtml(version.snapshot.clientName)}</h2><p>The fingerprint in this link matches the version reviewed by ${escapeHtml(quote.review.reviewer)}. If any quote detail changes, this approval and link are retired.</p><label>Private decision link<textarea id="share-url" readonly rows="5">${escapeHtml(url)}</textarea></label><div class="button-row"><button class="button primary" data-copy-link>${icon('copy')} Copy client link</button><a class="button secondary" href="${escapeHtml(url)}" target="_blank">Preview client page</a></div></div>
       <div class="ticket"><span>VERSION</span><b>${quote.currentVersion}</b><span>FINGERPRINT</span><code>${version.digest.slice(0, 16)}</code><span>EXPIRES</span><strong>${escapeHtml(dateLabel(version.snapshot.expiresOn))}</strong></div></section>
     <section class="send-confirm"><div><span class="station-code">FINAL STOP</span><h2>${quote.sentAt ? 'Marked as sent' : 'Mark it sent when it leaves'}</h2><p>${quote.sentAt ? `Sent ${escapeHtml(dateLabel(quote.sentAt))}. Waiting for a portable client receipt.` : 'Copy the link into your own email or message. Quote Decision does not contact the client or upload the quote.'}</p></div>${quote.sentAt ? `<button class="button secondary" data-import-receipt>Import client receipt</button>` : `<button class="button primary" data-mark-sent>Mark as sent ${icon('arrow')}</button>`}</section>
@@ -322,7 +322,7 @@ async function markSent(quote: Quote): Promise<void> {
   await quoteStore.put(quote); await refreshQuotes(); await shareScreen(quote); setToast('Marked as sent. Awaiting the client decision.');
 }
 
-async function clientPage(encoded: string): Promise<void> {
+async function clientPage(encoded: string, transientDecision?: Decision): Promise<void> {
   let payload: SharePayload;
   try {
     payload = decodeShare(encoded);
@@ -335,18 +335,20 @@ async function clientPage(encoded: string): Promise<void> {
   const snapshot = payload.snapshot;
   const expired = new Date(`${snapshot.expiresOn}T23:59:59`).getTime() < Date.now();
   const localQuote = quotes.find((quote) => quote.id === payload.quoteId);
-  const existingDecision = localQuote?.decision?.digest === payload.digest ? localQuote.decision : undefined;
+  const storedDecision = await clientReceiptStore.get(payload).catch(() => undefined);
+  const existingDecision = storedDecision ?? transientDecision ?? (localQuote?.decision?.digest === payload.digest ? localQuote.decision : undefined);
   app.innerHTML = `<main id="main" class="client-main"><header class="client-brand"><a class="brand" href="${appPath()}" aria-label="Quote Decision home"><span class="brand-mark">QD</span><span>Quote<br>Decision</span></a><span class="verified">✓ Fingerprint verified</span></header>
     <article class="client-quote"><div class="client-title"><div><span class="eyebrow">Decision requested · Quote ${escapeHtml(snapshot.number)}</span><h1>${escapeHtml(snapshot.project)}</h1><p>Prepared for ${escapeHtml(snapshot.clientName)}</p></div><strong>${escapeHtml(money(snapshot.totalCents, snapshot.currency))}</strong></div>
       <div class="client-meta"><span><b>Version</b>${payload.version}</span><span><b>Expires</b>${escapeHtml(dateLabel(snapshot.expiresOn))}</span><span><b>Fingerprint</b><code>${payload.digest.slice(0, 12)}…</code></span></div>
       ${expired ? '<div class="notice danger-notice"><b>This quote has expired.</b> You can review it, but a new decision cannot be recorded. Ask the sender for an updated quote.</div>' : ''}
       <section><h2>Scope and deliverables</h2><p>${escapeHtml(snapshot.scope).replaceAll('\n', '<br>')}</p>${snapshot.terms ? `<h2>Terms and assumptions</h2><p>${escapeHtml(snapshot.terms).replaceAll('\n', '<br>')}</p>` : ''}</section>
     </article>
-    ${existingDecision ? `<section class="client-decision">${decisionPanel(existingDecision)}<button class="button secondary" data-export-client-receipt>${icon('download')} Download receipt again</button></section>` : expired ? '' : `<form id="decision-form" class="client-decision"><span class="station-code">YOUR DECISION</span><h2>Record a clear answer</h2><p>This creates a portable receipt for you to return to the sender. Your entry stays on this device unless you share the downloaded file.</p><fieldset><legend>Choose one</legend><label class="decision-option accept"><input type="radio" name="decision" value="accepted" required><span><b>Accept this quote</b>I intend to proceed on this exact version.</span></label><label class="decision-option decline"><input type="radio" name="decision" value="declined"><span><b>Decline this quote</b>I do not intend to proceed on this version.</span></label></fieldset><label>Your full name<input name="clientName" autocomplete="name" required minlength="2" maxlength="500"></label><label>Note <span>(optional)</span><textarea name="note" rows="3" maxlength="500"></textarea></label><label class="consent"><input type="checkbox" name="consent" required><span>${CONSENT_TEXT}</span></label><p class="fine-print">This is an audit record of explicit consent, not a claim of a regulated electronic signature.</p><button class="button primary wide" type="submit">Record decision</button></form>`}
+    ${existingDecision ? `<section class="client-decision">${decisionPanel(existingDecision)}<div class="button-row"><button class="button secondary" data-export-client-receipt>${icon('download')} Download receipt again</button>${storedDecision ? '<button class="link-button danger-link" data-delete-client-receipt>Delete local receipt</button>' : ''}</div></section>` : expired ? '' : `<form id="decision-form" class="client-decision"><span class="station-code">YOUR DECISION</span><h2>Record a clear answer</h2><p>This creates a portable receipt for you to return to the sender. Your entry stays on this device unless you share the downloaded file.</p><fieldset><legend>Choose one</legend><label class="decision-option accept"><input type="radio" name="decision" value="accepted" required><span><b>Accept this quote</b>I intend to proceed on this exact version.</span></label><label class="decision-option decline"><input type="radio" name="decision" value="declined"><span><b>Decline this quote</b>I do not intend to proceed on this version.</span></label></fieldset><label>Your full name<input name="clientName" autocomplete="name" required minlength="2" maxlength="500"></label><label>Note <span>(optional)</span><textarea name="note" rows="3" maxlength="500"></textarea></label><label class="consent"><input type="checkbox" name="consent" required><span>${CONSENT_TEXT}</span></label><p class="fine-print">This is an audit record of explicit consent, not a claim of a regulated electronic signature.</p><button class="button primary wide" type="submit">Record decision</button></form>`}
     <footer class="client-footer"><span>Quote details are carried in this private link; they are not uploaded by Quote Decision.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span></footer><div id="live" class="sr-only" aria-live="polite"></div><div id="toast" class="toast" role="status" hidden></div></main>`;
   document.querySelector<HTMLFormElement>('#decision-form')?.addEventListener('submit', (event) => void recordClientDecision(event, payload));
   document.querySelector<HTMLInputElement>('#decision-form [name="clientName"]')?.addEventListener('input', (event) => (event.currentTarget as HTMLInputElement).setCustomValidity(''));
   document.querySelector('[data-export-client-receipt]')?.addEventListener('click', () => { if (existingDecision) void exportReceipt(existingDecision, snapshot.number); });
+  document.querySelector('[data-delete-client-receipt]')?.addEventListener('click', () => void deleteClientReceipt(payload));
 }
 
 async function recordClientDecision(event: SubmitEvent, payload: SharePayload): Promise<void> {
@@ -359,15 +361,30 @@ async function recordClientDecision(event: SubmitEvent, payload: SharePayload): 
   if (!form.reportValidity()) return;
   const decision: Decision = { quoteId: payload.quoteId, version: payload.version, digest: payload.digest, decision: String(values.get('decision')) as Decision['decision'], clientName, decidedAt: new Date().toISOString(), consentText: CONSENT_TEXT, note: String(values.get('note')).trim() };
   decision.receiptDigest = await digestDecision(decision);
+  let retained = true;
+  try { await clientReceiptStore.put(decision); }
+  catch { retained = false; }
   const local = await quoteStore.get(payload.quoteId).catch(() => undefined);
   if (local && local.versions.some((version) => version.version === payload.version && version.digest === payload.digest)) {
     if (local.currentVersion === payload.version) local.decision = decision;
     else local.decisionHistory = [...(local.decisionHistory ?? []), decision];
-    local.updatedAt = decision.decidedAt; await quoteStore.put(local); await refreshQuotes();
+    local.updatedAt = decision.decidedAt;
+    await quoteStore.put(local).then(() => refreshQuotes()).catch(() => undefined);
   }
   await exportReceipt(decision, payload.snapshot.number);
-  await clientPage(encodeShare(payload));
-  setToast('Decision recorded. Return the downloaded receipt to the sender.');
+  await clientPage(encodeShare(payload), decision);
+  setToast(retained ? 'Decision recorded. Return the downloaded receipt to the sender.' : 'Receipt downloaded, but this browser could not keep a local copy. Keep the file and allow site storage before trying again.');
+}
+
+async function deleteClientReceipt(payload: SharePayload): Promise<void> {
+  if (!confirm('Delete this client receipt from this device? Download it first if you need a copy.')) return;
+  try {
+    await clientReceiptStore.remove(payload);
+    await clientPage(encodeShare(payload));
+    setToast('Client receipt deleted from this device.');
+  } catch {
+    setToast('The client receipt could not be deleted. Check browser storage permissions and try again.');
+  }
 }
 
 async function exportReceipt(decision: Decision, quoteNumber: string): Promise<void> {
@@ -539,6 +556,7 @@ async function seedDemoData(): Promise<void> {
 async function resetDemo(): Promise<void> {
   if (!demoMode) return;
   await quoteStore.clear();
+  await clientReceiptStore.clear();
   quotes = [];
   await seedDemoData();
   navigate('home');

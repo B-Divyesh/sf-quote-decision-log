@@ -56,6 +56,13 @@
     "sandbox": "fresh /demo; export the accepted sample receipt and assert its schema, product, and decision"
   },
   {
+    "id": "client-decision-retention",
+    "claim": "A recorded client decision stays on that client's device.",
+    "where": "client decision form and completion state",
+    "test": "npm run test:e2e -- --grep @claim:client-decision-retention",
+    "sandbox": "create a normal quote; open its link in a genuinely separate clean 390px browser context; record a decision; assert the exact completion and repeat-download state immediately and after reload"
+  },
+  {
     "id": "unlimited-price",
     "claim": "Unlimited quotes cost $19 as a one-time purchase.",
     "where": "landing fact, data screen, paywall, terms",

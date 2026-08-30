@@ -6,7 +6,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await page.evaluate(async () => {
-    await Promise.all(['quote-decision-log', 'demo:quote-decision-log'].map((name) => new Promise<void>((resolve) => {
+    await Promise.all(['quote-decision-log', 'demo:quote-decision-log', 'quote-decision-client-receipts', 'demo:quote-decision-client-receipts'].map((name) => new Promise<void>((resolve) => {
       const request = indexedDB.deleteDatabase(name);
       request.onsuccess = () => resolve(); request.onerror = () => resolve(); request.onblocked = () => resolve();
     })));
@@ -76,6 +76,92 @@ test('creates, reviews, sends, and records a client decision', async ({ page, co
   expect(pageErrors).toEqual([]);
 });
 
+test('@claim:client-decision-retention retains a client decision in a separate clean browser context', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The separate client context uses the required 390px viewport.');
+
+  await page.getByRole('link', { name: 'Create a quote' }).click();
+  await page.getByLabel('Client name').fill('North & Pine');
+  await page.getByLabel('Project').fill('Separate browser launch');
+  await page.getByLabel('Total amount').fill('4800');
+  await page.getByLabel('Scope and deliverables').fill('Design and build a five-page launch site.');
+  await page.getByRole('button', { name: /save quote/i }).click();
+  await page.getByRole('button', { name: /review quote/i }).click();
+  for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
+  await page.getByLabel('Reviewer name').fill('Mira Chen');
+  await page.getByRole('button', { name: /mark send-ready/i }).click();
+  await page.getByRole('button', { name: /prepare client link/i }).click();
+  const link = await page.getByLabel('Private decision link').inputValue();
+
+  const clientContext = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true });
+  const clientPage = await clientContext.newPage();
+  const clientRequests: Array<{ method: string; url: string; body: string | null }> = [];
+  clientPage.on('request', (request) => clientRequests.push({ method: request.method(), url: request.url(), body: request.postData() }));
+  try {
+    await clientPage.goto(link);
+    expect(await clientPage.evaluate(async () => {
+      const databases = await indexedDB.databases();
+      const normal = databases.find((database) => database.name === 'quote-decision-log');
+      if (!normal) return 0;
+      return new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('quote-decision-log', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const count = request.result.transaction('quotes').objectStore('quotes').count();
+          count.onerror = () => reject(count.error);
+          count.onsuccess = () => resolve(count.result);
+        };
+      });
+    })).toBe(0);
+
+    await clientPage.getByText('Accept this quote').click();
+    await clientPage.getByLabel('Your full name').fill('Ada Client');
+    await clientPage.getByText(/I confirm I reviewed/).click();
+    const receiptDownload = clientPage.waitForEvent('download');
+    await clientPage.getByRole('button', { name: 'Record decision' }).click();
+    const receipt = JSON.parse(await (await receiptDownload).createReadStream().then(async (stream) => {
+      let content = '';
+      for await (const chunk of stream!) content += chunk.toString();
+      return content;
+    }));
+    expect(receipt).toMatchObject({ schema: 2, product: 'quote-decision-log', decision: 'accepted', clientName: 'Ada Client' });
+
+    await expect.soft(clientPage.getByRole('heading', { name: 'Accepted by Ada Client' })).toBeVisible();
+    await expect.soft(clientPage.getByRole('button', { name: /download receipt again/i })).toBeVisible();
+    await expect.soft(clientPage.locator('#decision-form')).toHaveCount(0);
+
+    await clientPage.reload();
+    await expect.soft(clientPage.getByRole('heading', { name: 'Accepted by Ada Client' })).toBeVisible();
+    await expect.soft(clientPage.getByRole('button', { name: /download receipt again/i })).toBeVisible();
+    await expect.soft(clientPage.locator('#decision-form')).toHaveCount(0);
+    const repeatedDownload = clientPage.waitForEvent('download');
+    await clientPage.getByRole('button', { name: /download receipt again/i }).click();
+    const repeatedReceipt = JSON.parse(await (await repeatedDownload).createReadStream().then(async (stream) => {
+      let content = '';
+      for await (const chunk of stream!) content += chunk.toString();
+      return content;
+    }));
+    expect(repeatedReceipt).toEqual(receipt);
+    expect(await clientPage.evaluate(async () => {
+      const databases = await indexedDB.databases();
+      const receiptDatabase = databases.find((database) => database.name === 'quote-decision-client-receipts');
+      if (!receiptDatabase) return 0;
+      return new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('quote-decision-client-receipts', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const count = request.result.transaction('receipts').objectStore('receipts').count();
+          count.onerror = () => reject(count.error);
+          count.onsuccess = () => resolve(count.result);
+        };
+      });
+    })).toBe(1);
+    expect(clientRequests.every((request) => request.method === 'GET' && new URL(request.url).origin === new URL(link).origin && request.body === null)).toBe(true);
+    expect(clientRequests.some((request) => request.url.includes('#client/') || request.url.includes('Ada%20Client'))).toBe(false);
+  } finally {
+    await clientContext.close();
+  }
+});
+
 test('has no serious accessibility findings on the empty state', async ({ page }) => {
   // @axe-core/playwright currently declares against a newer Playwright Page,
   // but its runtime API is compatible with the factory-pinned browser version.
@@ -133,6 +219,14 @@ test('supports the core review checkpoint with keyboard controls', async ({ page
 
 test('keeps data and legal links at the 44px mobile target baseline', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'desktop', 'This regression is measured at the mobile viewport.');
+  for (const path of ['/', '/demo', '/new', '/data']) {
+    await page.goto(path);
+    const skipLink = page.getByRole('link', { name: 'Skip to main content' });
+    await skipLink.focus();
+    const box = await skipLink.boundingBox();
+    expect(box?.height, `${path} skip-link height`).toBeGreaterThanOrEqual(44);
+    expect(box?.width, `${path} skip-link width`).toBeGreaterThanOrEqual(44);
+  }
   await page.goto('/data');
   const terms = page.getByRole('link', { name: 'Terms' }).last();
   const termsBox = await terms.boundingBox();
@@ -214,13 +308,13 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   const original = await readFile(swPath, 'utf8');
   try {
     await ensureServiceWorkerControl(page);
-    await writeFile(swPath, original.replaceAll('qd-shell-v3', 'qd-shell-v3-regression').replaceAll('qd-assets-v3', 'qd-assets-v3-regression'));
+    await writeFile(swPath, original.replaceAll('qd-shell-v4', 'qd-shell-v4-regression').replaceAll('qd-assets-v4', 'qd-assets-v4-regression'));
     await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())?.update(); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
-    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v3-regression'));
+    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v4-regression'));
     await expect(page.getByRole('heading', { name: /Review quotes before tiny agencies send/i })).toBeVisible();
-    expect(await page.evaluate(async () => (await caches.keys()).some((key) => key === 'qd-shell-v3'))).toBe(false);
+    expect(await page.evaluate(async () => (await caches.keys()).some((key) => key === 'qd-shell-v4'))).toBe(false);
   } finally {
     await writeFile(swPath, original);
   }

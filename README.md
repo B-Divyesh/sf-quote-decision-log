@@ -14,6 +14,7 @@ quotes in a separate demo database. Use **Reset demo** to restore them or
 - shows a named review before a quote is send-ready;
 - puts the reviewed quote in a private client-link fragment;
 - exports portable JSON decision receipts;
+- retains a client's own receipt on that device for later download;
 - exports the whole log as JSON and a summary as CSV;
 - shows each saved version's SHA-256 fingerprint;
 - works offline after the first visit;
@@ -38,7 +39,8 @@ npm run dev
 
 Data is specific to the browser origin. The normal quote log uses
 `quote-decision-log` IndexedDB. The demo uses `demo:quote-decision-log` and
-does not read or write the normal database.
+does not read or write the normal database. Client receipts use the separate
+`quote-decision-client-receipts` database, with a separate demo namespace.
 
 ## Verify
 
@@ -58,14 +60,15 @@ data recovery, and the quote-to-decision workflow.
 
 ## Privacy and data
 
-Quotes remain in browser IndexedDB. License tokens and their cached daily
+Quotes and client receipts remain in separate browser IndexedDB databases. License tokens and their cached daily
 verification result use localStorage. There are no analytics, advertising
 trackers, remote fonts, or runtime CDNs. Client links contain the quote in the
 URL fragment, so the app server does not receive the fragment. Anyone who has
 the link can read its contents.
 
 Use **Data and license** to export JSON or CSV, import a backup, or delete
-local quotes. Read the complete [privacy policy](public/privacy/index.html) and
+local quotes. A client can download or delete the local receipt from its link.
+Read the complete [privacy policy](public/privacy/index.html) and
 [terms](public/terms/index.html) before purchase.
 
 ## Deploy
