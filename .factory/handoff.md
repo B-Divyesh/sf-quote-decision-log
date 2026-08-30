@@ -1,99 +1,57 @@
-# Quote Decision repair handoff
+# Quote Decision verification handoff
 
-## Result: repaired and deployed
+## Result: FAIL
 
-This repair resolves every finding in the independent verifier report at
-`78b1ab24d41b47d3bfbef4005a205b425deda4bc` for candidate
-`d217cf47f83b48ef105c674142e96ab12400013b`.
+Independent verification completed on 2026-08-30 UTC.
 
-## What changed
+- Candidate: `96daeab61e7831fcd0a0027ef9a2cb083956a188`
+- Production: <https://quote-decision-log.sociobot.in>
+- Work order: `quote-decision-log-verify-3`
+- Full report: `.factory/verification-3.md`
 
-- **QD-009 — local-data integrity:** quote writes now validate the complete
-  record at the IndexedDB boundary, before any write. Quote fields mirror the
-  persisted schema limits, total amounts are capped to a safe cent value, and
-  review records are created immutably and validated before storage.
-- **QD-010 — client receipt integrity:** the signer field is limited to 500
-  characters and the decision handler rejects an out-of-schema trimmed signer
-  before recording or downloading a receipt. Correcting a field clears the
-  field-level recovery message.
-- **QD-011 — keyboard reliability:** `#main` is recognized as the skip-link
-  anchor rather than an application route. The app no longer rerenders or
-  steals focus after a keyboard user activates Skip to main content.
-- The destructive-action color token was raised to `#FF9B8F`, restoring
-  WCAG AA text contrast on the data screen.
+Production is byte-for-byte the candidate for all 16 public build files. The
+core local quote lifecycle, explicit client consent receipt, import/export,
+free limit, deletion, offline reload, service-worker update test, billing
+checkout, and API rate limit work. Normal live flows produced no console/page
+errors or serious/critical Axe findings. Lighthouse mobile scored 95
+performance and 100 accessibility/best-practices/SEO.
 
-## Regression coverage
+Release is blocked because `.factory/claims.json` is missing and the product
+has no one-click “Try it with sample data” demo or isolated demo mode. The cold
+first screen also does not say plainly that the product is for tiny agencies.
 
-- Unit coverage rejects an unsafe cent value and a 501-character reviewer
-  through `validateQuote`.
-- Browser coverage bypasses the HTML limits to prove an unsafe amount and an
-  overlong reviewer never reach IndexedDB, then reloads the remaining valid
-  quote successfully.
-- The client lifecycle test bypasses `maxlength` to prove a 501-character
-  signer cannot create a receipt, then records a valid decision.
-- The full keyboard workflow activates the skip link before creating and
-  reviewing a quote.
+Additional defects are cold-load focus bypassing the skip link/navigation,
+sub-44 px mobile legal links, contradictory “Unlimited is active” copy after
+an invalid returned license, incomplete route titles/social metadata/sitemap/
+404 behavior, and an uncaught error when service workers are explicitly
+blocked.
 
-## Verification run on 2026-08-30 UTC
+## Verification commands
 
 ```text
-npm ci                              PASS — 61 packages, 0 vulnerabilities
-npm test                            PASS — 10/10
-npm run typecheck                   PASS
-npm run lint                        PASS
-npm run build                       PASS — dist/ emitted
-npm run test:e2e                    PASS — 19 passed, 5 intentional skips
+npm ci                 PASS — 61 packages, 0 vulnerabilities
+npm test               PASS — 10/10
+npm run typecheck      PASS
+npm run lint           PASS
+npm run build          PASS — dist/ emitted
+npm run test:e2e       PASS — 19 passed, 5 skipped (isolated run)
 ```
 
-The final complete Playwright run used the pinned 1.58.2 Chromium and covered
-desktop plus Pixel 5 / 390 px. It includes the quote lifecycle, keyboard and
-skip link, Axe serious/critical scans, privacy request assertions, legal
-screens, offline reload, service-worker update, responsive targets, storage
-recovery, receipt import, and the new validation regressions. Browser
-assertions found no unexpected failures.
+The billing verify endpoint allowed 30 burst requests and returned 429 on
+request 31 with `Retry-After: 3`. Checkout returned HTTP 303 to the hosted Dodo
+checkout.
 
-Exact production build output:
+## Required next steps
 
-```text
-Initial JS   45.19 kB raw / 14.30 kB gzip
-CSS          21.73 kB raw / 5.76 kB gzip
-Mobile hero  25.96 kB
-```
+1. Add `.factory/claims.json` and demo-entry claim tests for every product and
+   README claim.
+2. Add a one-click, separately namespaced sample-data demo plus
+   `.factory/demo.md` and reset/start-real controls.
+3. Rewrite the first screen to state the job, tiny-agency audience, and first
+   action in plain words; add the required copy audit.
+4. Fix the keyboard focus order, mobile touch targets, invalid-license rerender,
+   real route titles/URLs, social metadata, sitemap, and 404.
+5. Rerun the complete clean-checkout, live, offline, accessibility, privacy,
+   rate-limit, and deployment-identity verification.
 
-The deployment-policy unit test confirms manifest MIME, immutable hashed
-assets, CSP, and Permissions-Policy. No product backend or third-party
-runtime service is used; state remains in browser IndexedDB.
-
-## Run locally
-
-```sh
-npm ci
-npm test
-npm run typecheck
-npm run lint
-npm run build
-npm run test:e2e
-```
-
-## Deployment and live identity
-
-Repair commit `2115903d17b4664505598486d2691032d32c01f5` was pushed to `main`
-and deployed on 2026-08-30 UTC with the factory static deployment configuration.
-The deployment upload completed successfully for `sf-quote-decision-log`; the
-custom domain was ready and returned HTTPS 200.
-
-Live identity checks at `https://quote-decision-log.sociobot.in/` matched the
-final production build assets:
-
-```text
-assets/index-D7f_gC9W.js
-assets/index-Ca24nuYc.css
-```
-
-Live policy checks found `Cache-Control: no-cache` for the document,
-`application/manifest+json` for the manifest, and
-`public, max-age=31536000, immutable` for the hashed JavaScript. The live
-document sends CSP, Permissions-Policy, `Referrer-Policy: no-referrer`, and
-`X-Content-Type-Options: nosniff`.
-
-No known product gaps remain from the verifier report.
+No product source code was modified during verification.
