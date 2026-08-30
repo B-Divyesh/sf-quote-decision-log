@@ -1,6 +1,6 @@
 # Quote Decision repair handoff
 
-## Result: repaired and ready to deploy
+## Result: repaired and deployed
 
 This repair resolves every finding in the independent verifier report at
 `78b1ab24d41b47d3bfbef4005a205b425deda4bc` for candidate
@@ -75,9 +75,25 @@ npm run build
 npm run test:e2e
 ```
 
-## Deployment and known gaps
+## Deployment and live identity
 
-The static deployment artifact remains `dist/` with `index.html` at its root.
-Push `main` to deploy through the factory static configuration. No known
-product gaps remain from the verifier report; post-push live identity and
-response-policy checks are the final handoff step.
+Repair commit `2115903d17b4664505598486d2691032d32c01f5` was pushed to `main`
+and deployed on 2026-08-30 UTC with the factory static deployment configuration.
+The deployment upload completed successfully for `sf-quote-decision-log`; the
+custom domain was ready and returned HTTPS 200.
+
+Live identity checks at `https://quote-decision-log.sociobot.in/` matched the
+final production build assets:
+
+```text
+assets/index-D7f_gC9W.js
+assets/index-Ca24nuYc.css
+```
+
+Live policy checks found `Cache-Control: no-cache` for the document,
+`application/manifest+json` for the manifest, and
+`public, max-age=31536000, immutable` for the hashed JavaScript. The live
+document sends CSP, Permissions-Policy, `Referrer-Policy: no-referrer`, and
+`X-Content-Type-Options: nosniff`.
+
+No known product gaps remain from the verifier report.
