@@ -133,8 +133,34 @@ npm run test:e2e
 
 ## Deployment and live verification
 
-Deployment evidence will be appended after the repair commit is pushed and the
-`sf-quote-decision-log` static application is updated.
+Repair commit `d339c62e10d96cebee855b2f667cfa47ed48a58e` was pushed to `main` and
+deployed only to the permitted `sf-quote-decision-log` Static Web App with:
+
+```sh
+/opt/fleet/lib/deploy-static.sh quote-decision-log dist
+```
+
+Azure deployment `59232a72-5900-4958-952c-757cd2cb5ad8` succeeded. The custom
+domain <https://quote-decision-log.sociobot.in> returned HTTPS 200. No other
+service, database, key vault, or cloud resource was read or changed.
+
+Post-deploy evidence:
+
+```text
+factory verify-url.sh               PASS — 660ms, no console/page errors
+critical live browser claims        PASS — 5/5
+production file identity            PASS — 20/20 byte-for-byte matches
+/demo                               PASS — HTTP 200
+unknown route                       PASS — designed HTTP 404
+billing checkout                    PASS — HTTP 303 to hosted checkout
+```
+
+The five live tests covered the genuinely separate-client receipt retention,
+correct client-link copy, local-device privacy, one-click isolated demo, and
+offline reload. The root and service worker send `Cache-Control: no-cache`;
+hashed JavaScript sends `public, max-age=31536000, immutable`; the manifest is
+`application/manifest+json`. HSTS, the restrictive CSP, Permissions-Policy,
+`Referrer-Policy: no-referrer`, and `X-Content-Type-Options: nosniff` are live.
 
 ## Known gaps
 
