@@ -87,10 +87,29 @@ npm run test:e2e
 
 ## Deployment and live verification
 
-The repair commit will be pushed to `main` and deployed using
-`/opt/fleet/lib/deploy-static.sh quote-decision-log dist`. This section will be
-updated with the resulting commit, live URL, headers, identity comparison, and
-post-deploy browser evidence.
+Repair commit `e1892e1bdc17eaf71cc3e79d78963ccd62acecbe` is pushed to `main`
+and deployed to <https://quote-decision-log.sociobot.in> with
+`/opt/fleet/lib/deploy-static.sh quote-decision-log dist`. Azure reported
+deployment `6b9afe9c-d15f-410c-9c0a-d523304687e0` as succeeded; the permitted
+`sf-quote-decision-log` Static Web App and custom domain both returned HTTPS
+200.
+
+Post-deploy `verify-url.sh` passed: 946 ms load, no console/page errors,
+`lang=en`, one h1, one main, no missing image alt, and no unlabeled button.
+The live desktop demo has title `Demo — Quote Decision`, canonical `/demo`,
+two samples, a working demo banner, natural first-Tab skip link, and only
+same-origin requests. The 390 px `?demo=1` entry also showed both samples and
+the banner. A fresh live context loaded the demo, went offline, reloaded, and
+kept the sample quotes with the offline banner visible and no page errors.
+
+All 19 deployable files (excluding the host-only `staticwebapp.config.json`
+and source map) SHA-256 matched `dist/`, including `index.html`, hashed JS/CSS,
+manifest, service worker, legal pages, sitemap, 404 page, icons, and social
+preview. Live `/demo`, `/new`, `/data`, `/privacy/`, and `/terms/` returned
+200; an unknown route returned the designed 404 with HTTP 404. Root document
+and service worker sent `Cache-Control: no-cache`; the hashed JavaScript sent
+`public, max-age=31536000, immutable`. HSTS, CSP, Permissions-Policy,
+Referrer-Policy, and `X-Content-Type-Options: nosniff` are live.
 
 ## Known product gaps
 
