@@ -133,6 +133,9 @@ export const quoteStore = {
     return withStore<Quote | undefined>('readonly', (store) => store.get(id));
   },
   put(quote: Quote): Promise<IDBValidKey> {
+    // Every write goes through the same schema guard used for imports and reads.
+    // UI constraints improve recovery, but are not a persistence boundary.
+    validateQuote(quote, 'The quote you are saving');
     return withStore<IDBValidKey>('readwrite', (store) => store.put(quote));
   },
   remove(id: string): Promise<undefined> {

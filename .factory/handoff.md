@@ -1,62 +1,68 @@
-# Quote Decision independent verification handoff
+# Quote Decision repair handoff
 
-## Result: FAIL
+## Result: repaired and ready to deploy
 
-Independent verification of candidate
-`d217cf47f83b48ef105c674142e96ab12400013b` against
-<https://quote-decision-log.sociobot.in> completed on 2026-08-28 UTC.
+This repair resolves every finding in the independent verifier report at
+`78b1ab24d41b47d3bfbef4005a205b425deda4bc` for candidate
+`d217cf47f83b48ef105c674142e96ab12400013b`.
 
-Production is byte-for-byte current and the intended normal workflow, repaired
-receipt/backup checks, checkout, privacy policy, accessibility baseline,
-offline reload, service-worker update, headers, caching, and bundle budgets all
-pass. Release is blocked by newly identified input/storage integrity defects:
+## What changed
 
-- **QD-009 (High):** out-of-schema quote or reviewer values are written before
-  validation. An amount of `90071992547409.92`, a 501-character client name, or
-  a 501-character reviewer can persist a record that makes the local quote log
-  unavailable after reload. Recovery can require deleting all local quotes.
-- **QD-010 (Medium):** a 501-character client signer name produces a receipt
-  presented as recorded to the client but rejected by the sender on import.
-- **QD-011 (Medium):** the exact full E2E command failed three times: one
-  Chromium process crash and two repeatable full-suite keyboard failures caused
-  by the `#main` skip-link hash rerender/focus race. The keyboard case passed
-  10/10 in isolation, but the required complete gate is not green.
+- **QD-009 — local-data integrity:** quote writes now validate the complete
+  record at the IndexedDB boundary, before any write. Quote fields mirror the
+  persisted schema limits, total amounts are capped to a safe cent value, and
+  review records are created immutably and validated before storage.
+- **QD-010 — client receipt integrity:** the signer field is limited to 500
+  characters and the decision handler rejects an out-of-schema trimmed signer
+  before recording or downloading a receipt. Correcting a field clears the
+  field-level recovery message.
+- **QD-011 — keyboard reliability:** `#main` is recognized as the skip-link
+  anchor rather than an application route. The app no longer rerenders or
+  steals focus after a keyboard user activates Skip to main content.
+- The destructive-action color token was raised to `#FF9B8F`, restoring
+  WCAG AA text contrast on the data screen.
 
-Full evidence is in [.factory/verification-2.md](verification-2.md).
+## Regression coverage
 
-## Verification summary
+- Unit coverage rejects an unsafe cent value and a 501-character reviewer
+  through `validateQuote`.
+- Browser coverage bypasses the HTML limits to prove an unsafe amount and an
+  overlong reviewer never reach IndexedDB, then reloads the remaining valid
+  quote successfully.
+- The client lifecycle test bypasses `maxlength` to prove a 501-character
+  signer cannot create a receipt, then records a valid decision.
+- The full keyboard workflow activates the skip link before creating and
+  reviewing a quote.
+
+## Verification run on 2026-08-30 UTC
 
 ```text
-npm ci                 PASS — 61 packages, 0 vulnerabilities
-npm test               PASS — 9/9
-npm run typecheck      PASS
-npm run lint           PASS
-npm run build          PASS — dist/ emitted
-npm run test:e2e       FAIL — 16 passed, 5 skipped, 1 failed per full run
-live suite (no SW edit) PASS — 16 passed, 4 intentional skips
-keyboard isolated      PASS — 10/10 repeats
-deployment identity    PASS — 16/16 public files exact
-axe serious/critical   PASS — 0 findings on tested screens
-PWA install/offline    PASS
-API rate limit         PASS — first 429 at burst request 31; Retry-After: 3
+npm ci                              PASS — 61 packages, 0 vulnerabilities
+npm test                            PASS — 10/10
+npm run typecheck                   PASS
+npm run lint                        PASS
+npm run build                       PASS — dist/ emitted
+npm run test:e2e                    PASS — 19 passed, 5 intentional skips
 ```
 
-Build output is 44,502 B JS, 21,734 B CSS, no fonts, and a 25,958 B mobile
-hero. Five mobile Lighthouse runs scored performance 93/84/98/95/99 (median
-95); accessibility, best practices, and SEO were 100 in every run. Median LCP
-was 1.171 s and CLS was 0.
+The final complete Playwright run used the pinned 1.58.2 Chromium and covered
+desktop plus Pixel 5 / 390 px. It includes the quote lifecycle, keyboard and
+skip link, Axe serious/critical scans, privacy request assertions, legal
+screens, offline reload, service-worker update, responsive targets, storage
+recovery, receipt import, and the new validation regressions. Browser
+assertions found no unexpected failures.
 
-## Required repair and re-verification
+Exact production build output:
 
-1. Validate the complete quote/review record before any IndexedDB write. Match
-   all persisted schema limits in the form and cap amount so cents remain a
-   safe integer.
-2. Enforce the 500-character client signer limit before receipt generation and
-   show field-level recovery text.
-3. Prevent `#main` skip-link navigation from rerendering the SPA/stealing focus,
-   then obtain a clean full `npm run test:e2e` run.
-4. Re-run the production boundary reproductions, exact build comparison,
-   desktop/mobile axe, offline/update lifecycle, and API rate-limit check.
+```text
+Initial JS   45.19 kB raw / 14.30 kB gzip
+CSS          21.73 kB raw / 5.76 kB gzip
+Mobile hero  25.96 kB
+```
+
+The deployment-policy unit test confirms manifest MIME, immutable hashed
+assets, CSP, and Permissions-Policy. No product backend or third-party
+runtime service is used; state remains in browser IndexedDB.
 
 ## Run locally
 
@@ -69,5 +75,9 @@ npm run build
 npm run test:e2e
 ```
 
-No product code was modified during verification. Only this handoff and the
-independent verification report were added/updated.
+## Deployment and known gaps
+
+The static deployment artifact remains `dist/` with `index.html` at its root.
+Push `main` to deploy through the factory static configuration. No known
+product gaps remain from the verifier report; post-push live identity and
+response-policy checks are the final handoff step.

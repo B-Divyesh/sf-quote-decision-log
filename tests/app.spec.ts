@@ -59,8 +59,14 @@ test('creates, reviews, sends, and records a client decision', async ({ page, co
   const clientA11y = await new AxeBuilder({ page: page as never }).analyze();
   expect(clientA11y.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? ''))).toEqual([]);
   await page.getByText('Accept this quote').click();
-  await page.getByLabel('Your full name').fill('Ada Client');
   await page.getByText(/I confirm I reviewed/).click();
+  const signer = page.getByLabel('Your full name');
+  await signer.evaluate((input) => { input.removeAttribute('maxlength'); });
+  await signer.fill('A'.repeat(501));
+  await page.getByRole('button', { name: 'Record decision' }).click();
+  await expect.poll(() => signer.evaluate((input) => (input as HTMLInputElement).validationMessage)).toMatch(/2 and 500/i);
+  await expect(page.getByRole('heading', { name: /Launch site/i })).toBeVisible();
+  await signer.fill('Ada Client');
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Record decision' }).click();
   expect((await download).suggestedFilename()).toContain('decision-');
@@ -174,6 +180,42 @@ test('rejects whitespace-only required quote fields with field guidance', async 
   await expect(page.getByText('Complete the highlighted fields before saving.')).toBeVisible();
   await expect(page.getByText('Enter a client name, not only spaces.')).toBeVisible();
   await expect(page).toHaveURL(/#new$/);
+});
+
+test('never persists a quote or review that violates the stored schema', async ({ page }) => {
+  const countStoredQuotes = () => page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const request = indexedDB.open('quote-decision-log', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const get = request.result.transaction('quotes').objectStore('quotes').getAll();
+      get.onerror = () => reject(get.error);
+      get.onsuccess = () => resolve(get.result.length);
+    };
+  }));
+
+  await page.getByRole('link', { name: /create your first quote/i }).click();
+  await page.getByLabel('Client name').fill('Bounded Co');
+  await page.getByLabel('Project').fill('Schema guard');
+  const amount = page.getByLabel('Total amount');
+  await amount.fill('90071992547409.92');
+  await amount.evaluate((input) => { input.removeAttribute('max'); });
+  await page.getByLabel('Scope and deliverables').fill('Confirm invalid values do not reach IndexedDB.');
+  await page.getByRole('button', { name: /save quote/i }).click();
+  await expect(page.locator('#form-error')).toContainText(/larger amounts cannot be stored safely/i);
+  expect(await countStoredQuotes()).toBe(0);
+
+  await page.getByLabel('Total amount').fill('10');
+  await page.getByRole('button', { name: /save quote/i }).click();
+  await page.getByRole('button', { name: /review quote/i }).click();
+  for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
+  const reviewer = page.getByLabel('Reviewer name');
+  await reviewer.evaluate((input) => { input.removeAttribute('maxlength'); });
+  await reviewer.fill('R'.repeat(501));
+  await page.getByRole('button', { name: /mark send-ready/i }).click();
+  await expect.poll(() => reviewer.evaluate((input) => (input as HTMLInputElement).validationMessage)).toMatch(/2 and 500/i);
+  expect(await countStoredQuotes()).toBe(1);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Schema guard', level: 1 })).toBeVisible();
 });
 
 test('rejects a structurally invalid backup without damaging the log', async ({ page }) => {

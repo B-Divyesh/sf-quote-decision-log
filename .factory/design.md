@@ -28,7 +28,7 @@ utility. Every surface is painted; the UI does not depend on browser theme.
 | Route blue | `--route` | `#5FB2BA` | informational / sent state |
 | Success | `--go` | `#76C58B` | accepted / reviewed |
 | Warning | `--hold` | `#E1B55A` | expiry / pending |
-| Danger | `--stop` | `#E9796D` | declined / destructive |
+| Danger | `--stop` | `#FF9B8F` | declined / destructive |
 | Rule | `--rule` | `#496066` | borders and rails |
 
 Focus is a 3px brass outline with a 3px dark offset. Status always includes a
@@ -105,4 +105,3 @@ photorealism, no extra symbols.”
 - `public/icons/icon.svg`, maskable/install PNGs, and UI glyphs: original
   geometric artwork authored in-repository for Quote Decision, MIT with the
   product.
-

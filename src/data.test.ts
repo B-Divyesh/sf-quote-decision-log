@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CONSENT_TEXT, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, stableSnapshot, validateBundle, validateDecision } from './data';
+import { CONSENT_TEXT, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, stableSnapshot, validateBundle, validateDecision, validateQuote } from './data';
 import type { Decision, ExportBundle, Quote, QuoteSnapshot, SharePayload } from './types';
 
 const snapshot: QuoteSnapshot = {
@@ -69,5 +69,14 @@ describe('portable data integrity', () => {
     await expect(validateBundle(bundle)).resolves.toEqual(bundle);
     validQuote.versions[0].snapshot = { ...snapshot, project: 'Changed after export' };
     await expect(validateBundle(bundle)).rejects.toThrow(/fingerprint/i);
+  });
+
+  it('rejects unsafe amounts and overlong reviewers before they can be stored', () => {
+    const validVersion = { version: 1, createdAt: '2026-08-28T00:00:00.000Z', digest: 'a'.repeat(64), snapshot };
+    expect(() => validateQuote(quote({ versions: [{ ...validVersion, snapshot: { ...snapshot, totalCents: Number.MAX_SAFE_INTEGER + 1 } }] }))).toThrow(/quote details/i);
+    expect(() => validateQuote(quote({
+      versions: [validVersion],
+      review: { version: 1, reviewer: 'R'.repeat(501), reviewedAt: '2026-08-28T00:00:00.000Z', checks: ['assumptions', 'price', 'scope'] },
+    }))).toThrow(/review/i);
   });
 });

@@ -8,6 +8,7 @@ import type { Decision, ExportBundle, Quote, QuoteSnapshot, SharePayload } from 
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 const FREE_LIMIT = 5;
+const MAX_SAFE_AMOUNT = '90071992547409.91';
 let quotes: Quote[] = [];
 let storageError = '';
 let toastTimer = 0;
@@ -126,8 +127,8 @@ function quoteForm(existing?: Quote): void {
   if (!existing && quotes.length >= FREE_LIMIT && !isUnlocked()) { paywall(); return; }
   app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${existing ? `#quote/${existing.id}` : '#home'}">← Back</a><span class="eyebrow">${existing ? `Version ${existing.currentVersion}` : 'New route'}</span><h1>${existing ? 'Edit quote' : 'Create a quote'}</h1><p>${existing ? 'Saving a changed reviewed quote creates a new version and clears approval.' : 'Capture the commercial promise. You can review it next.'}</p></div></header>
     <form id="quote-form" class="form-panel" novalidate>
-      <div class="form-section"><span class="station-code">IDENTITY</span><h2>Quote and client</h2><div class="field-grid three"><label>Quote number<input name="number" required aria-describedby="number-error" value="${escapeHtml(snapshot?.number ?? `Q-${new Date().getFullYear()}-${String(quotes.length + 1).padStart(3, '0')}`)}"><span class="field-error" id="number-error" hidden>Enter a quote number, not only spaces.</span></label><label>Client name<input name="clientName" autocomplete="organization" required aria-describedby="clientName-error" value="${escapeHtml(snapshot?.clientName)}"><span class="field-error" id="clientName-error" hidden>Enter a client name, not only spaces.</span></label><label>Client email <span>(optional)</span><input name="clientEmail" type="email" autocomplete="email" value="${escapeHtml(snapshot?.clientEmail)}"></label></div></div>
-      <div class="form-section"><span class="station-code">COMMITMENT</span><h2>Work and value</h2><div class="field-grid"><label>Project<input name="project" required aria-describedby="project-error" value="${escapeHtml(snapshot?.project)}"><span class="field-error" id="project-error" hidden>Enter a project name, not only spaces.</span></label><label>Expiry date<input name="expiresOn" type="date" required value="${escapeHtml(snapshot?.expiresOn ?? today.toISOString().slice(0, 10))}"></label><label>Currency<select name="currency"><option>USD</option><option>EUR</option><option>GBP</option><option>INR</option><option>AUD</option><option>CAD</option></select></label><label>Total amount<input name="amount" type="number" min="0" step="0.01" inputmode="decimal" required value="${snapshot ? (snapshot.totalCents / 100).toFixed(2) : ''}"></label></div><label>Scope and deliverables<textarea name="scope" required rows="7" aria-describedby="scope-error">${escapeHtml(snapshot?.scope)}</textarea><span class="field-error" id="scope-error" hidden>Describe the scope; spaces alone cannot be saved.</span></label><label>Terms or assumptions <span>(optional)</span><textarea name="terms" rows="4">${escapeHtml(snapshot?.terms)}</textarea></label></div>
+      <div class="form-section"><span class="station-code">IDENTITY</span><h2>Quote and client</h2><div class="field-grid three"><label>Quote number<input name="number" required maxlength="200" aria-describedby="number-error" value="${escapeHtml(snapshot?.number ?? `Q-${new Date().getFullYear()}-${String(quotes.length + 1).padStart(3, '0')}`)}"><span class="field-error" id="number-error" hidden>Enter a quote number, not only spaces.</span></label><label>Client name<input name="clientName" autocomplete="organization" required maxlength="500" aria-describedby="clientName-error" value="${escapeHtml(snapshot?.clientName)}"><span class="field-error" id="clientName-error" hidden>Enter a client name, not only spaces.</span></label><label>Client email <span>(optional)</span><input name="clientEmail" type="email" autocomplete="email" maxlength="500" value="${escapeHtml(snapshot?.clientEmail)}"></label></div></div>
+      <div class="form-section"><span class="station-code">COMMITMENT</span><h2>Work and value</h2><div class="field-grid"><label>Project<input name="project" required maxlength="500" aria-describedby="project-error" value="${escapeHtml(snapshot?.project)}"><span class="field-error" id="project-error" hidden>Enter a project name, not only spaces.</span></label><label>Expiry date<input name="expiresOn" type="date" required value="${escapeHtml(snapshot?.expiresOn ?? today.toISOString().slice(0, 10))}"></label><label>Currency<select name="currency"><option>USD</option><option>EUR</option><option>GBP</option><option>INR</option><option>AUD</option><option>CAD</option></select></label><label>Total amount<input name="amount" type="number" min="0" max="${MAX_SAFE_AMOUNT}" step="0.01" inputmode="decimal" required aria-describedby="amount-error" value="${snapshot ? (snapshot.totalCents / 100).toFixed(2) : ''}"><span class="field-error" id="amount-error" hidden>Enter an amount up to ${MAX_SAFE_AMOUNT}; larger amounts cannot be stored safely.</span></label></div><label>Scope and deliverables<textarea name="scope" required maxlength="50000" rows="7" aria-describedby="scope-error">${escapeHtml(snapshot?.scope)}</textarea><span class="field-error" id="scope-error" hidden>Describe the scope; spaces alone cannot be saved.</span></label><label>Terms or assumptions <span>(optional)</span><textarea name="terms" maxlength="50000" rows="4">${escapeHtml(snapshot?.terms)}</textarea></label></div>
       <div id="form-error" class="form-error" role="alert" hidden></div><div class="form-actions"><button class="button primary" type="submit">${existing ? 'Save version' : 'Save quote'} ${icon('arrow')}</button><a class="button secondary" href="${existing ? `#quote/${existing.id}` : '#home'}">Cancel</a></div>
     </form>`, existing ? 'home' : 'new');
   const currency = document.querySelector<HTMLSelectElement>('[name="currency"]');
@@ -152,10 +153,17 @@ async function saveQuote(event: SubmitEvent, existing?: Quote): Promise<void> {
   if (!form.reportValidity()) { error.hidden = false; error.textContent = 'Complete the highlighted fields before saving.'; return; }
   const values = new FormData(form);
   const amount = Number(values.get('amount'));
-  if (!Number.isFinite(amount) || amount < 0) { error.hidden = false; error.textContent = 'Enter a valid total amount.'; return; }
+  const cents = Math.round(amount * 100);
+  const amountError = document.querySelector<HTMLElement>('#amount-error');
+  if (!Number.isFinite(amount) || amount < 0 || !Number.isSafeInteger(cents)) {
+    error.hidden = false; error.textContent = `Enter an amount up to ${MAX_SAFE_AMOUNT}; larger amounts cannot be stored safely.`;
+    if (amountError) amountError.hidden = false;
+    return;
+  }
+  if (amountError) amountError.hidden = true;
   const snapshot: QuoteSnapshot = {
     number: String(values.get('number')).trim(), clientName: String(values.get('clientName')).trim(), clientEmail: String(values.get('clientEmail')).trim(),
-    project: String(values.get('project')).trim(), currency: String(values.get('currency')), totalCents: Math.round(amount * 100),
+    project: String(values.get('project')).trim(), currency: String(values.get('currency')), totalCents: cents,
     expiresOn: String(values.get('expiresOn')), scope: String(values.get('scope')).trim(), terms: String(values.get('terms')).trim(),
   };
   try {
@@ -164,6 +172,7 @@ async function saveQuote(event: SubmitEvent, existing?: Quote): Promise<void> {
     if (existing && existing.versions.some((version) => version.digest === digest)) { location.hash = `quote/${existing.id}`; setToast('No changes to save.'); return; }
     const version = existing ? existing.currentVersion + 1 : 1;
     const quote: Quote = existing ? { ...existing, updatedAt: now, currentVersion: version, versions: [...existing.versions, { version, createdAt: now, digest, snapshot }], review: undefined, sentAt: undefined, decisionHistory: existing.decision ? [...(existing.decisionHistory ?? []), existing.decision] : existing.decisionHistory, decision: undefined } : { id: crypto.randomUUID(), createdAt: now, updatedAt: now, currentVersion: 1, versions: [{ version: 1, createdAt: now, digest, snapshot }] };
+    validateQuote(quote, 'This quote');
     await quoteStore.put(quote);
     await refreshQuotes();
     location.hash = `quote/${quote.id}`;
@@ -218,7 +227,7 @@ function reviewScreen(quote: Quote): void {
   const snapshot = currentSnapshot(quote);
   app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="#quote/${quote.id}">← Quote ${escapeHtml(snapshot.number)}</a><span class="eyebrow">Internal checkpoint · Version ${quote.currentVersion}</span><h1>Review before sending</h1><p>Confirm the exact scope, price, and assumptions below. All checks are required.</p></div></header>${workflow(0)}
     <div class="review-layout"><section class="review-sheet"><span class="station-code">REVIEW COPY</span><h2>${escapeHtml(snapshot.project)}</h2><dl><div><dt>Client</dt><dd>${escapeHtml(snapshot.clientName)}</dd></div><div><dt>Total</dt><dd>${escapeHtml(money(snapshot.totalCents, snapshot.currency))}</dd></div><div><dt>Expiry</dt><dd>${escapeHtml(dateLabel(snapshot.expiresOn))}</dd></div></dl><h3>Scope</h3><p>${escapeHtml(snapshot.scope).replaceAll('\n', '<br>')}</p>${snapshot.terms ? `<h3>Terms</h3><p>${escapeHtml(snapshot.terms).replaceAll('\n', '<br>')}</p>` : ''}</section>
-      <form id="review-form" class="checkpoint"><span class="station-code">CLEARANCE</span><h2>Three-point check</h2><label class="check-row"><input type="checkbox" name="checks" value="scope" required><span><b>Scope is complete</b>The deliverables match what the client expects.</span></label><label class="check-row"><input type="checkbox" name="checks" value="price" required><span><b>Price and expiry are correct</b>The commercial details are ready to stand behind.</span></label><label class="check-row"><input type="checkbox" name="checks" value="assumptions" required><span><b>Assumptions are visible</b>Dependencies and boundaries are not hidden.</span></label><label class="reviewer">Reviewer name<input name="reviewer" autocomplete="name" required minlength="2"></label><p class="fine-print">Your name records an internal approval for this version. It is not a legal signature.</p><button class="button primary wide" type="submit">${icon('check')} Mark send-ready</button></form></div>`, 'home');
+      <form id="review-form" class="checkpoint"><span class="station-code">CLEARANCE</span><h2>Three-point check</h2><label class="check-row"><input type="checkbox" name="checks" value="scope" required><span><b>Scope is complete</b>The deliverables match what the client expects.</span></label><label class="check-row"><input type="checkbox" name="checks" value="price" required><span><b>Price and expiry are correct</b>The commercial details are ready to stand behind.</span></label><label class="check-row"><input type="checkbox" name="checks" value="assumptions" required><span><b>Assumptions are visible</b>Dependencies and boundaries are not hidden.</span></label><label class="reviewer">Reviewer name<input name="reviewer" autocomplete="name" required minlength="2" maxlength="500"></label><p class="fine-print">Your name records an internal approval for this version. It is not a legal signature.</p><button class="button primary wide" type="submit">${icon('check')} Mark send-ready</button></form></div>`, 'home');
   document.querySelector<HTMLFormElement>('#review-form')?.addEventListener('submit', (event) => void approveQuote(event, quote));
   bindShared();
 }
@@ -227,14 +236,16 @@ async function approveQuote(event: SubmitEvent, quote: Quote): Promise<void> {
   event.preventDefault();
   const form = event.currentTarget as HTMLFormElement;
   const reviewer = form.elements.namedItem('reviewer') as HTMLInputElement;
-  reviewer.setCustomValidity(reviewer.value.trim().length < 2 ? 'Enter at least two non-space characters.' : '');
+  const reviewerName = reviewer.value.trim();
+  reviewer.setCustomValidity(reviewerName.length < 2 || reviewerName.length > 500 ? 'Enter a name between 2 and 500 characters.' : '');
   if (!form.reportValidity()) return;
   const values = new FormData(form);
-  quote.review = { version: quote.currentVersion, reviewer: String(values.get('reviewer')).trim(), reviewedAt: new Date().toISOString(), checks: values.getAll('checks').map(String) };
-  quote.updatedAt = new Date().toISOString();
-  await quoteStore.put(quote);
+  const reviewedAt = new Date().toISOString();
+  const reviewedQuote: Quote = { ...quote, updatedAt: reviewedAt, review: { version: quote.currentVersion, reviewer: reviewerName, reviewedAt, checks: values.getAll('checks').map(String) } };
+  validateQuote(reviewedQuote, 'This quote review');
+  await quoteStore.put(reviewedQuote);
   await refreshQuotes();
-  quoteDetail(quote);
+  quoteDetail(reviewedQuote);
   setToast('Review recorded. This exact version is send-ready.');
 }
 
@@ -280,20 +291,20 @@ async function clientPage(encoded: string): Promise<void> {
       ${expired ? '<div class="notice danger-notice"><b>This quote has expired.</b> You can review it, but a new decision cannot be recorded. Ask the sender for an updated quote.</div>' : ''}
       <section><h2>Scope and deliverables</h2><p>${escapeHtml(snapshot.scope).replaceAll('\n', '<br>')}</p>${snapshot.terms ? `<h2>Terms and assumptions</h2><p>${escapeHtml(snapshot.terms).replaceAll('\n', '<br>')}</p>` : ''}</section>
     </article>
-    ${existingDecision ? `<section class="client-decision">${decisionPanel(existingDecision)}<button class="button secondary" data-export-client-receipt>${icon('download')} Download receipt again</button></section>` : expired ? '' : `<form id="decision-form" class="client-decision"><span class="station-code">YOUR DECISION</span><h2>Record a clear answer</h2><p>This creates a portable receipt for you to return to the sender. Your entry stays on this device unless you share the downloaded file.</p><fieldset><legend>Choose one</legend><label class="decision-option accept"><input type="radio" name="decision" value="accepted" required><span><b>Accept this quote</b>I intend to proceed on this exact version.</span></label><label class="decision-option decline"><input type="radio" name="decision" value="declined"><span><b>Decline this quote</b>I do not intend to proceed on this version.</span></label></fieldset><label>Your full name<input name="clientName" autocomplete="name" required minlength="2"></label><label>Note <span>(optional)</span><textarea name="note" rows="3" maxlength="500"></textarea></label><label class="consent"><input type="checkbox" name="consent" required><span>${CONSENT_TEXT}</span></label><p class="fine-print">This is an audit record of explicit consent, not a claim of a regulated electronic signature.</p><button class="button primary wide" type="submit">Record decision</button></form>`}
+    ${existingDecision ? `<section class="client-decision">${decisionPanel(existingDecision)}<button class="button secondary" data-export-client-receipt>${icon('download')} Download receipt again</button></section>` : expired ? '' : `<form id="decision-form" class="client-decision"><span class="station-code">YOUR DECISION</span><h2>Record a clear answer</h2><p>This creates a portable receipt for you to return to the sender. Your entry stays on this device unless you share the downloaded file.</p><fieldset><legend>Choose one</legend><label class="decision-option accept"><input type="radio" name="decision" value="accepted" required><span><b>Accept this quote</b>I intend to proceed on this exact version.</span></label><label class="decision-option decline"><input type="radio" name="decision" value="declined"><span><b>Decline this quote</b>I do not intend to proceed on this version.</span></label></fieldset><label>Your full name<input name="clientName" autocomplete="name" required minlength="2" maxlength="500"></label><label>Note <span>(optional)</span><textarea name="note" rows="3" maxlength="500"></textarea></label><label class="consent"><input type="checkbox" name="consent" required><span>${CONSENT_TEXT}</span></label><p class="fine-print">This is an audit record of explicit consent, not a claim of a regulated electronic signature.</p><button class="button primary wide" type="submit">Record decision</button></form>`}
     <footer class="client-footer"><span>Quote details are carried in this private link; they are not uploaded by Quote Decision.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span></footer><div id="live" class="sr-only" aria-live="polite"></div><div id="toast" class="toast" role="status" hidden></div></main>`;
   document.querySelector<HTMLFormElement>('#decision-form')?.addEventListener('submit', (event) => void recordClientDecision(event, payload));
+  document.querySelector<HTMLInputElement>('#decision-form [name="clientName"]')?.addEventListener('input', (event) => (event.currentTarget as HTMLInputElement).setCustomValidity(''));
   document.querySelector('[data-export-client-receipt]')?.addEventListener('click', () => { if (existingDecision) void exportReceipt(existingDecision, snapshot.number); });
 }
 
 async function recordClientDecision(event: SubmitEvent, payload: SharePayload): Promise<void> {
   event.preventDefault();
   const form = event.currentTarget as HTMLFormElement;
-  if (!form.reportValidity()) return;
   const values = new FormData(form);
   const clientName = String(values.get('clientName')).trim();
   const nameField = form.elements.namedItem('clientName') as HTMLInputElement;
-  nameField.setCustomValidity(clientName.length < 2 ? 'Enter at least two non-space characters.' : '');
+  nameField.setCustomValidity(clientName.length < 2 || clientName.length > 500 ? 'Enter a name between 2 and 500 characters.' : '');
   if (!form.reportValidity()) return;
   const decision: Decision = { quoteId: payload.quoteId, version: payload.version, digest: payload.digest, decision: String(values.get('decision')) as Decision['decision'], clientName, decidedAt: new Date().toISOString(), consentText: CONSENT_TEXT, note: String(values.get('note')).trim() };
   decision.receiptDigest = await digestDecision(decision);
@@ -421,6 +432,9 @@ async function refreshQuotes(): Promise<void> {
 
 function route(): void {
   const hash = location.hash.slice(1) || 'home';
+  // The global skip link points at the current main landmark. It is an anchor,
+  // not an application route; rerendering here steals focus from keyboard users.
+  if (hash === 'main' && document.querySelector('#main')) return;
   if (hash.startsWith('client/')) { void clientPage(hash.slice(7)); return; }
   if (hash === 'home') dashboard();
   else if (hash === 'new') quoteForm();
