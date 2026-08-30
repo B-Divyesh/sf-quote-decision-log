@@ -1,43 +1,49 @@
 # Quote Decision
 
-Quote Decision is a local-first approval checkpoint and client decision trail
-for tiny agencies. It keeps a quote’s scope, price, expiry, named internal
-review, send status, and client accept/decline receipt together—without an
-account or hosted document system.
+Quote Decision helps tiny agencies review a quote before sending it and keep a
+clear client decision trail. It is a local-first PWA.
 
-Live product: <https://quote-decision-log.sociobot.in>
+Try the shipped sample workspace at
+<https://quote-decision-log.sociobot.in/demo>. It starts with two realistic
+quotes in a separate demo database. Use **Reset demo** to restore them or
+**Start for real** to open your own empty quote log.
 
 ## What it does
 
-- saves quotes and immutable SHA-256 version fingerprints in IndexedDB;
-- requires a named reviewer to clear scope, price, and assumptions;
-- creates a private client URL containing the reviewed version in the URL
-  fragment (the quote is not uploaded by the app);
-- records explicit accept/decline consent with a typed name and timestamp;
-- downloads and verifies portable JSON decision receipts;
-- exports/restores the complete JSON log and exports a CSV overview;
-- installs as a PWA and continues working offline after first load;
-- provides a useful five-quote free edition and a $19 one-time unlimited
-  license through the Sociobot billing API.
+- keeps quote data in browser IndexedDB on the device;
+- shows a named review before a quote is send-ready;
+- puts the reviewed quote in a private client-link fragment;
+- exports portable JSON decision receipts;
+- exports the whole log as JSON and a summary as CSV;
+- shows each saved version's SHA-256 fingerprint;
+- works offline after the first visit;
+- supports five free quotes; a $19 one-time purchase unlocks unlimited quotes.
 
-Quote Decision does not claim that its click record is a regulated electronic
-signature. It is not a payment tool or a quote document editor.
+Quote Decision is not a payment tool, document editor, or regulated electronic
+signature service. A decision receipt records explicit click consent and a
+typed name only.
+
+Every visitor-facing product claim is listed with its exact browser test in
+[`.factory/claims.json`](.factory/claims.json). The sample sandbox is described
+in [`.factory/demo.md`](.factory/demo.md).
 
 ## Develop
 
 Requires Node.js 20 or later.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-The development server prints its local URL. Data is specific to that browser
-origin.
+Data is specific to the browser origin. The normal quote log uses
+`quote-decision-log` IndexedDB. The demo uses `demo:quote-decision-log` and
+does not read or write the normal database.
 
 ## Verify
 
 ```sh
+npm ci
 npm test
 npm run typecheck
 npm run lint
@@ -45,42 +51,35 @@ npm run build
 npm run test:e2e
 ```
 
-`npm run build` is the deployment command. It creates `dist/` with
-`dist/index.html` at its root. End-to-end tests use the factory-pinned
-Playwright 1.58.2 Chromium browser and cover desktop, 390px mobile,
-accessibility, the complete quote lifecycle, and offline reload.
+`npm run build` creates `dist/` with `dist/index.html` at its root. The pinned
+Playwright suite covers desktop, 390 px mobile, keyboard flow, accessibility,
+privacy requests, sample-demo claims, offline reload, service-worker update,
+data recovery, and the quote-to-decision workflow.
 
-## Data and privacy
+## Privacy and data
 
-Quotes remain in the browser’s IndexedDB. License tokens and their daily cached
+Quotes remain in browser IndexedDB. License tokens and their cached daily
 verification result use localStorage. There are no analytics, advertising
 trackers, remote fonts, or runtime CDNs. Client links contain the quote in the
-URL fragment; anyone with the link can read it, so send it through an
-appropriate channel. Use the in-app Data and license screen for export, import,
-and deletion.
+URL fragment, so the app server does not receive the fragment. Anyone who has
+the link can read its contents.
 
-Decision receipts use schema 2. They include the exact consent text and a
-SHA-256 integrity fingerprint over the quote reference, answer, signer,
-timestamp, consent, and note. Altered or legacy receipts without this evidence
-are rejected; existing decisions in a valid schema-1 full backup remain
-restorable for backward compatibility.
+Use **Data and license** to export JSON or CSV, import a backup, or delete
+local quotes. Read the complete [privacy policy](public/privacy/index.html) and
+[terms](public/terms/index.html) before purchase.
 
-See [`public/privacy/index.html`](public/privacy/index.html) and
-[`public/terms/index.html`](public/terms/index.html).
+## Deploy
 
-## Deployment
+Publish `dist/` to the static host. `public/staticwebapp.config.json` rewrites
+the product's real application URLs, serves the designed 404 page for unknown
+paths, sets security headers, and keeps hashed assets immutable. The service
+worker requires HTTPS in production.
 
-Publish the contents of `dist/` to the static host. Configure unknown routes to
-fall back to `index.html`; `/privacy/` and `/terms/` are emitted as standalone
-pages. The service worker is scoped to `/` and must be served over HTTPS in
-production.
-
-## Design and provenance
+## Design and license
 
 The product-specific visual system and generated-art provenance are documented
-in [`.factory/design.md`](.factory/design.md). Source art is retained in
-`assets/src/`; optimized WebP files ship in the app.
-
-## License
+in [`.factory/design.md`](.factory/design.md). The social preview is derived
+from the same original dispatch-gate artwork. Source art is retained in
+`assets/src/`.
 
 MIT. See [LICENSE](LICENSE).

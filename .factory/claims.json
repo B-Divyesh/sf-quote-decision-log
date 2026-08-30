@@ -1,0 +1,79 @@
+[
+  {
+    "id": "demo-sample-data",
+    "claim": "Try it with sample data opens two isolated sample quotes.",
+    "where": "landing action and demo banner",
+    "test": "npm run test:e2e -- --grep @claim:demo-sample-data",
+    "sandbox": "fresh browser; click the landing action; assert /demo, banner, samples, and demo IndexedDB namespace"
+  },
+  {
+    "id": "local-device-privacy",
+    "claim": "Quote data stays on this device during normal use.",
+    "where": "landing facts, data screen, privacy page",
+    "test": "npm run test:e2e -- --grep @claim:local-device-privacy",
+    "sandbox": "fresh /demo browser flow; record every request while opening a sample quote and assert same-origin only"
+  },
+  {
+    "id": "json-export",
+    "claim": "Exports the quote log as JSON.",
+    "where": "data screen and README",
+    "test": "npm run test:e2e -- --grep @claim:json-export",
+    "sandbox": "fresh /demo; download JSON and assert exactly two seeded quotes"
+  },
+  {
+    "id": "csv-export",
+    "claim": "Exports the quote log as CSV.",
+    "where": "data screen and README",
+    "test": "npm run test:e2e -- --grep @claim:csv-export",
+    "sandbox": "fresh /demo; download CSV and assert one header plus two quote rows"
+  },
+  {
+    "id": "quote-fingerprint",
+    "claim": "Each saved quote version has a SHA-256 fingerprint.",
+    "where": "quote detail, client view, README",
+    "test": "npm run test:e2e -- --grep @claim:quote-fingerprint",
+    "sandbox": "fresh /demo; open a seeded quote and assert its exposed full 64-character fingerprint"
+  },
+  {
+    "id": "review-checkpoint",
+    "claim": "A named review is shown before a quote is send-ready.",
+    "where": "quote detail, review screen, README",
+    "test": "npm run test:e2e -- --grep @claim:review-checkpoint",
+    "sandbox": "fresh /demo; open the send-ready Website launch sample and assert its named review and send-ready status"
+  },
+  {
+    "id": "client-link",
+    "claim": "A client link carries the reviewed quote in its URL fragment.",
+    "where": "share screen and README",
+    "test": "npm run test:e2e -- --grep @claim:client-link",
+    "sandbox": "fresh /demo; prepare the Website launch link and assert its client payload is in the URL fragment"
+  },
+  {
+    "id": "decision-receipt",
+    "claim": "Exports a portable JSON client decision receipt.",
+    "where": "quote detail and README",
+    "test": "npm run test:e2e -- --grep @claim:decision-receipt",
+    "sandbox": "fresh /demo; export the accepted sample receipt and assert its schema, product, and decision"
+  },
+  {
+    "id": "unlimited-price",
+    "claim": "Unlimited quotes cost $19 as a one-time purchase.",
+    "where": "landing fact, data screen, paywall, terms",
+    "test": "npm run test:e2e -- --grep @claim:unlimited-price",
+    "sandbox": "fresh /demo; leave through Start for real, open Data and license, and assert the exact $19 one-time option"
+  },
+  {
+    "id": "free-five-quotes",
+    "claim": "The free edition supports up to five quotes.",
+    "where": "data screen, paywall, terms, README",
+    "test": "npm run test:e2e -- --grep @claim:free-five-quotes",
+    "sandbox": "fresh /demo with two seeds; add three quotes and assert the fifth fills the free allowance"
+  },
+  {
+    "id": "offline-reload",
+    "claim": "Works offline after the first visit.",
+    "where": "landing facts and README",
+    "test": "npm run test:e2e -- --grep @claim:offline-reload",
+    "sandbox": "own fresh /demo browser context; install shell, set offline, reload, and assert both sample log and offline banner"
+  }
+]

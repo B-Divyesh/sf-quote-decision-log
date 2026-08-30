@@ -5,10 +5,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
-  await page.evaluate(() => new Promise<void>((resolve) => {
-    const request = indexedDB.deleteDatabase('quote-decision-log');
-    request.onsuccess = () => resolve(); request.onerror = () => resolve(); request.onblocked = () => resolve();
-  }));
+  await page.evaluate(async () => {
+    await Promise.all(['quote-decision-log', 'demo:quote-decision-log'].map((name) => new Promise<void>((resolve) => {
+      const request = indexedDB.deleteDatabase(name);
+      request.onsuccess = () => resolve(); request.onerror = () => resolve(); request.onblocked = () => resolve();
+    })));
+  });
   await page.reload();
 });
 
@@ -25,7 +27,7 @@ test('creates, reviews, sends, and records a client decision', async ({ page, co
   const requestUrls: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('request', (request) => requestUrls.push(request.url()));
-  await page.getByRole('link', { name: /create your first quote/i }).click();
+  await page.getByRole('link', { name: 'Create a quote' }).click();
   await page.getByLabel('Client name').fill('North & Pine');
   await page.getByLabel('Client email').fill('hello@example.com');
   await page.getByLabel('Project').fill('Launch site');
@@ -85,7 +87,7 @@ test('has no serious accessibility findings on the empty state', async ({ page }
 
 test('has no serious accessibility findings on form, data, and legal screens', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'The mobile client screen is scanned in the lifecycle test.');
-  for (const path of ['/#new', '/#data', '/privacy/', '/terms/']) {
+  for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/']) {
     await page.goto(path);
     const results = await new AxeBuilder({ page: page as never }).analyze();
     expect(results.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')), path).toEqual([]);
@@ -96,22 +98,26 @@ test('has no serious accessibility findings on form, data, and legal screens', a
 
 test('supports the core review checkpoint with keyboard controls', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'Keyboard workflow is viewport-independent and exercised once.');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
   await page.getByRole('link', { name: 'Skip to main content' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('main')).toBeFocused();
 
-  await page.getByRole('link', { name: /create your first quote/i }).focus();
+  await page.getByRole('link', { name: 'Create a quote' }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Create a quote' })).toBeVisible();
-  await expect(page.locator('main')).toBeFocused();
+  const createHeading = page.getByRole('heading', { name: 'Create a quote' });
+  await expect(createHeading).toBeVisible();
+  await expect(createHeading).toBeFocused();
   for (const [label, value] of [['Client name', 'Keyboard Co'], ['Project', 'Keyboard route'], ['Total amount', '850'], ['Scope and deliverables', 'Keyboard-only workflow.']] as const) {
     await page.getByLabel(label).focus();
     await page.keyboard.type(value);
   }
   await page.getByRole('button', { name: /save quote/i }).focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Keyboard route', level: 1 })).toBeVisible();
-  await expect(page.locator('main')).toBeFocused();
+  const quoteHeading = page.getByRole('heading', { name: 'Keyboard route', level: 1 });
+  await expect(quoteHeading).toBeVisible();
+  await expect(quoteHeading).toBeFocused();
   await page.getByRole('button', { name: /review quote/i }).focus();
   await page.keyboard.press('Enter');
   for (const checkbox of await page.getByRole('checkbox').all()) {
@@ -125,9 +131,71 @@ test('supports the core review checkpoint with keyboard controls', async ({ page
   await expect(page.getByText('Send-ready', { exact: true })).toBeVisible();
 });
 
+test('keeps data and legal links at the 44px mobile target baseline', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'desktop', 'This regression is measured at the mobile viewport.');
+  await page.goto('/data');
+  const terms = page.getByRole('link', { name: 'Terms' }).last();
+  const termsBox = await terms.boundingBox();
+  expect(termsBox?.height).toBeGreaterThanOrEqual(44);
+  expect(termsBox?.width).toBeGreaterThanOrEqual(44);
+  for (const path of ['/privacy/', '/terms/']) {
+    await page.goto(path);
+    for (const link of await page.locator('main a, header a, footer a').all()) {
+      const box = await link.boundingBox();
+      expect(box?.height, `${path} ${await link.innerText()}`).toBeGreaterThanOrEqual(44);
+      expect(box?.width, `${path} ${await link.innerText()}`).toBeGreaterThanOrEqual(44);
+    }
+  }
+});
+
+test('rerenders paid state immediately after an invalid license verification', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'License state is viewport-independent.');
+  await page.route('https://pilot-api.sociobot.in/api/v1/products/quote-decision-log/verify**', (route) => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ valid: false, reason: 'revoked' }),
+  }));
+  await page.goto('/data');
+  await page.evaluate(() => {
+    localStorage.setItem('sb_license:quote-decision-log', 'invalid-license-token');
+    localStorage.setItem('sb_license:quote-decision-log:verdict', JSON.stringify({ valid: true, checkedAt: Date.now() }));
+  });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Unlimited is active' })).toBeVisible();
+  await page.getByRole('button', { name: 'Verify license now' }).click();
+  await expect(page.getByRole('heading', { name: 'Keep every quote moving' })).toBeVisible();
+  await expect(page.locator('#license-status')).toContainText('License no longer active');
+  await expect(page.getByRole('link', { name: /buy unlimited/i })).toBeVisible();
+});
+
+test('uses real app URLs, route titles, social metadata, and the designed 404 page', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'Route metadata is viewport-independent.');
+  await page.goto('/new');
+  await expect(page).toHaveTitle('New quote — Quote Decision');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/new$/);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /social-preview\.jpg$/);
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveCount(1);
+  await page.goto('/404.html');
+  await expect(page).toHaveTitle('Page not found — Quote Decision');
+  await expect(page.getByRole('heading', { name: 'This page is not in the quote log.' })).toBeVisible();
+});
+
+test('does not throw when service worker registration is blocked', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The resilience check runs once in Chromium.');
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  try {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: /Review quotes before tiny agencies send/i })).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 test('retains the loaded app while offline', async ({ page, context }, testInfo) => {
   test.skip(testInfo.project.name === 'desktop', 'Offline behavior is exercised once in the mobile Chromium project.');
-  await expect(page.getByRole('heading', { name: /Every quote/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Review quotes before tiny agencies send/i })).toBeVisible();
   await ensureServiceWorkerControl(page);
   await page.waitForFunction(async () => {
     const keys = await caches.keys();
@@ -137,7 +205,7 @@ test('retains the loaded app while offline', async ({ page, context }, testInfo)
   await context.setOffline(true);
   await page.goto('/#home');
   await expect(page.locator('.offline-banner')).toBeVisible();
-  await expect(page.getByRole('link', { name: /create your first quote/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Create a quote' })).toBeVisible();
 });
 
 test('offers and activates a waiting service-worker update', async ({ page }, testInfo) => {
@@ -151,7 +219,7 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
     await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v3-regression'));
-    await expect(page.getByRole('heading', { name: /Every quote/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Review quotes before tiny agencies send/i })).toBeVisible();
     expect(await page.evaluate(async () => (await caches.keys()).some((key) => key === 'qd-shell-v3'))).toBe(false);
   } finally {
     await writeFile(swPath, original);
@@ -164,14 +232,14 @@ test('stores a returned one-time license and verifies the unlock', async ({ page
     contentType: 'application/json',
     body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null }),
   }));
-  await page.goto('/?license=test-license-token#data');
+  await page.goto('/data?license=test-license-token');
   await expect(page.getByRole('heading', { name: 'Unlimited is active' })).toBeVisible();
   expect(new URL(page.url()).searchParams.has('license')).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem('sb_license:quote-decision-log'))).toBe('test-license-token');
 });
 
 test('rejects whitespace-only required quote fields with field guidance', async ({ page }) => {
-  await page.getByRole('link', { name: /create your first quote/i }).click();
+  await page.getByRole('link', { name: 'Create a quote' }).click();
   await page.getByLabel('Client name').fill('   ');
   await page.getByLabel('Project').fill('   ');
   await page.getByLabel('Total amount').fill('0');
@@ -179,7 +247,7 @@ test('rejects whitespace-only required quote fields with field guidance', async 
   await page.getByRole('button', { name: /save quote/i }).click();
   await expect(page.getByText('Complete the highlighted fields before saving.')).toBeVisible();
   await expect(page.getByText('Enter a client name, not only spaces.')).toBeVisible();
-  await expect(page).toHaveURL(/#new$/);
+  await expect(page).toHaveURL(/\/new$/);
 });
 
 test('never persists a quote or review that violates the stored schema', async ({ page }) => {
@@ -193,7 +261,7 @@ test('never persists a quote or review that violates the stored schema', async (
     };
   }));
 
-  await page.getByRole('link', { name: /create your first quote/i }).click();
+  await page.getByRole('link', { name: 'Create a quote' }).click();
   await page.getByLabel('Client name').fill('Bounded Co');
   await page.getByLabel('Project').fill('Schema guard');
   const amount = page.getByLabel('Total amount');
@@ -219,7 +287,7 @@ test('never persists a quote or review that violates the stored schema', async (
 });
 
 test('rejects a structurally invalid backup without damaging the log', async ({ page }) => {
-  await page.goto('/#data');
+  await page.goto('/data');
   const invalidBackup = {
     schema: 1,
     product: 'quote-decision-log',
@@ -228,8 +296,8 @@ test('rejects a structurally invalid backup without damaging the log', async ({ 
   };
   await page.locator('#backup-file').setInputFiles({ name: 'invalid-backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(invalidBackup)) });
   await expect(page.locator('#toast').getByText(/no quote versions/i)).toBeVisible();
-  await page.goto('/#home');
-  await expect(page.getByRole('heading', { name: /Every quote/i })).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /Review quotes before tiny agencies send/i })).toBeVisible();
 });
 
 test('offers an explicit recovery path for previously stored invalid data', async ({ page }, testInfo) => {
@@ -250,12 +318,12 @@ test('offers an explicit recovery path for previously stored invalid data', asyn
   await expect(page.getByRole('alert')).toContainText('Local data needs recovery');
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete invalid local data' }).click();
-  await page.goto('/#home');
-  await expect(page.getByRole('heading', { name: /Every quote/i })).toBeVisible();
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /Review quotes before tiny agencies send/i })).toBeVisible();
 });
 
 test('shows a valid imported receipt immediately and rejects missing consent', async ({ page }) => {
-  await page.getByRole('link', { name: /create your first quote/i }).click();
+  await page.getByRole('link', { name: 'Create a quote' }).click();
   await page.getByLabel('Client name').fill('Immediate Co');
   await page.getByLabel('Project').fill('Receipt refresh');
   await page.getByLabel('Total amount').fill('1900');

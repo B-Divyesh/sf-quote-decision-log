@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://quote-decision-log.sociobot.in/sitemap.xml

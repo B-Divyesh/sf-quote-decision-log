@@ -1,7 +1,7 @@
 import './styles.css';
 import hero640 from './assets/dispatch-gate-640.webp';
 import hero960 from './assets/dispatch-gate-960.webp';
-import { CONSENT_TEXT, currentSnapshot, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, quoteStore, validateBundle, validateDecision, validateQuote } from './data';
+import { CONSENT_TEXT, currentSnapshot, decodeShare, digestDecision, digestSnapshot, encodeShare, quoteStatus, quoteStore, useDemoQuoteStorage, validateBundle, validateDecision, validateQuote } from './data';
 import { csvEscape, downloadText } from './download';
 import { captureReturnedLicense, checkoutUrl, clearLicense, isUnlocked, licenseToken, saveLicense, verifyLicense } from './license';
 import type { Decision, ExportBundle, Quote, QuoteSnapshot, SharePayload } from './types';
@@ -12,6 +12,56 @@ const MAX_SAFE_AMOUNT = '90071992547409.91';
 let quotes: Quote[] = [];
 let storageError = '';
 let toastTimer = 0;
+const demoMode = location.pathname === '/demo' || location.pathname.startsWith('/demo/') || new URLSearchParams(location.search).get('demo') === '1';
+
+// A demo is a separate IndexedDB database, never a view over real quotes.
+useDemoQuoteStorage(demoMode);
+
+type AppRoute = 'home' | 'new' | 'data' | `quote/${string}` | `edit/${string}`;
+
+function appPath(route: AppRoute = 'home'): string {
+  const base = demoMode ? '/demo' : '';
+  if (route === 'home') return base || '/';
+  return `${base}/${route}`;
+}
+
+function currentRoute(): AppRoute {
+  const base = demoMode ? '/demo' : '';
+  const route = location.pathname.slice(base.length).replace(/^\/+|\/+$/g, '');
+  if (!route) return 'home';
+  if (route === 'new' || route === 'data' || route.startsWith('quote/') || route.startsWith('edit/')) return route as AppRoute;
+  return 'home';
+}
+
+function routeForCurrentMode(pathname: string): AppRoute | null {
+  const base = demoMode ? '/demo' : '';
+  if (demoMode ? !(pathname === '/demo' || pathname.startsWith('/demo/')) : pathname.startsWith('/demo')) return null;
+  const segment = pathname.slice(base.length).replace(/^\/+|\/+$/g, '');
+  if (!segment) return 'home';
+  if (segment === 'new' || segment === 'data' || segment.startsWith('quote/') || segment.startsWith('edit/')) return segment as AppRoute;
+  return null;
+}
+
+function setDocumentDetails(title: string, description: string): void {
+  document.title = title;
+  document.querySelector<HTMLMetaElement>('meta[name="description"]')?.setAttribute('content', description);
+  document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.setAttribute('href', `${location.origin}${location.pathname}`);
+  document.querySelector<HTMLMetaElement>('meta[property="og:title"]')?.setAttribute('content', title);
+  document.querySelector<HTMLMetaElement>('meta[property="og:description"]')?.setAttribute('content', description);
+  document.querySelector<HTMLMetaElement>('meta[name="twitter:title"]')?.setAttribute('content', title);
+  document.querySelector<HTMLMetaElement>('meta[name="twitter:description"]')?.setAttribute('content', description);
+}
+
+function navigate(destination: AppRoute): void {
+  const target = appPath(destination);
+  if (location.pathname === target && !location.hash) { route(true); return; }
+  history.pushState(null, '', target);
+  route(true);
+}
+
+function hasUnlimitedQuotes(): boolean {
+  return !demoMode && isUnlocked();
+}
 
 const escapeHtml = (value: string | number | undefined) => String(value ?? '')
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
@@ -45,17 +95,18 @@ function icon(name: 'home' | 'new' | 'data' | 'check' | 'arrow' | 'copy' | 'down
 function shell(content: string, section = 'home'): string {
   return `<div class="shell">
     <header class="rail">
-      <a class="brand" href="#home" aria-label="Quote Decision home"><span class="brand-mark">QD</span><span>Quote<br>Decision</span></a>
+      <a class="brand" href="${appPath()}" aria-label="Quote Decision home"><span class="brand-mark">QD</span><span>Quote<br>Decision</span></a>
       <nav aria-label="Primary">
-        <a href="#home" ${section === 'home' ? 'aria-current="page"' : ''}>${icon('home')}<span>Quote log</span></a>
-        <a href="#new" ${section === 'new' ? 'aria-current="page"' : ''}>${icon('new')}<span>New quote</span></a>
-        <a href="#data" ${section === 'data' ? 'aria-current="page"' : ''}>${icon('data')}<span>Data & license</span></a>
+        <a href="${appPath()}" ${section === 'home' ? 'aria-current="page"' : ''}>${icon('home')}<span>Quote log</span></a>
+        <a href="${appPath('new')}" ${section === 'new' ? 'aria-current="page"' : ''}>${icon('new')}<span>New quote</span></a>
+        <a href="${appPath('data')}" ${section === 'data' ? 'aria-current="page"' : ''}>${icon('data')}<span>Data & license</span></a>
+        <a href="/demo" ${demoMode ? 'aria-current="page"' : ''}>${icon('check')}<span>Try demo</span></a>
       </nav>
       <div class="rail-foot"><span id="network-state" class="network-state"><i></i>${navigator.onLine ? 'Online' : 'Offline'}</span><span class="privacy-note">Private on this device</span></div>
     </header>
     <div id="offline-banner" class="offline-banner" ${navigator.onLine ? 'hidden' : ''}>Offline — changes stay here on this device.</div>
-    <main id="main" tabindex="-1">${content}</main>
-    <footer><span>Built for careful small teams.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Original AI-assisted poster artwork.</span></footer>
+    <main id="main" tabindex="-1">${demoMode ? '<aside class="demo-banner" aria-label="Demo mode"><span><b>Demo</b> — sample data, nothing is saved.</span><button type="button" data-reset-demo>Reset demo</button><a href="/">Start for real</a></aside>' : ''}${content}</main>
+    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.1</span></footer>
     <div id="live" class="sr-only" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
   </div>`;
@@ -78,7 +129,7 @@ function setToast(message: string, action?: string): void {
 }
 
 function renderError(title: string, detail: string): void {
-  app.innerHTML = shell(`<section class="empty compact"><span class="station-code">SERVICE NOTICE</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p><div class="button-row centered"><button class="button primary" data-retry>Try again</button><a class="button secondary" href="#data">Open data recovery</a></div></section>`);
+  app.innerHTML = shell(`<section class="empty compact"><span class="station-code">SERVICE NOTICE</span><h1>${escapeHtml(title)}</h1><p>${escapeHtml(detail)}</p><div class="button-row centered"><button class="button primary" data-retry>Try again</button><a class="button secondary" href="${appPath('data')}">Open data recovery</a></div></section>`);
   document.querySelector('[data-retry]')?.addEventListener('click', () => void boot());
 }
 
@@ -86,15 +137,15 @@ function dashboard(): void {
   if (storageError) { renderError('Local storage is unavailable', storageError); return; }
   if (!quotes.length) {
     app.innerHTML = shell(`<section class="hero">
-      <div class="hero-copy"><span class="eyebrow">A checkpoint before commitment</span><h1>Every quote makes the right stops.</h1><p>Review the exact version before it leaves. Record the client’s answer when it returns. Keep the whole trail on your device.</p><div class="hero-actions"><a class="button primary" href="#new">Create your first quote ${icon('arrow')}</a><span>No account. Works offline.</span></div></div>
-      <figure><picture><source media="(max-width: 700px)" srcset="${hero640}"><img src="${hero960}" width="960" height="640" alt="Geometric rail lines passing through a brass checkpoint toward a ticket" fetchpriority="high" decoding="async"></picture><figcaption>One gate between draft and promise.</figcaption></figure>
-    </section><section class="how"><span class="station-code">THE ROUTE</span><h2>Four stops. One clear record.</h2><ol><li><b>01</b><span><strong>Draft</strong>Capture scope, value, and expiry.</span></li><li><b>02</b><span><strong>Review</strong>A named teammate checks the exact version.</span></li><li><b>03</b><span><strong>Send</strong>Share a private, portable decision link.</span></li><li><b>04</b><span><strong>Record</strong>Import the client’s consent receipt.</span></li></ol></section>`);
+      <div class="hero-copy"><span class="eyebrow">Quote review and decision record</span><h1>Review quotes before tiny agencies send.</h1><p>For tiny agencies that need one checked quote and a clear client answer before work starts.</p><div class="hero-actions"><a class="button primary" href="/demo">Try it with sample data ${icon('arrow')}</a><span>See two sample quotes; no data is saved.</span><a class="text-action" href="${appPath('new')}">Create a quote</a></div><ul class="plain-facts"><li>Stored in this browser</li><li>Works offline after the first visit</li><li>$19 one-time unlimited license</li></ul></div>
+      <figure><picture><source media="(max-width: 700px)" srcset="${hero640}"><img src="${hero960}" width="960" height="640" alt="Geometric rail lines passing through a brass checkpoint toward a ticket" fetchpriority="high" decoding="async"></picture><figcaption>Review before sending.</figcaption></figure>
+    </section><section class="how"><span class="station-code">HOW IT WORKS</span><h2>Review, send, then record the answer.</h2><ol><li><b>01</b><span><strong>Draft</strong>Capture scope, value, and expiry.</span></li><li><b>02</b><span><strong>Review</strong>A named teammate checks the exact version.</span></li><li><b>03</b><span><strong>Send</strong>Share a private, portable decision link.</span></li><li><b>04</b><span><strong>Record</strong>Import the client’s consent receipt.</span></li></ol></section>`);
     bindShared();
     return;
   }
 
   const counts = quotes.reduce((acc, quote) => { acc[quoteStatus(quote)]++; return acc; }, { draft: 0, ready: 0, sent: 0, accepted: 0, declined: 0, expired: 0 });
-  app.innerHTML = shell(`<header class="page-head"><div><span class="eyebrow">Decision control</span><h1>Quote log</h1><p>${quotes.length} quote${quotes.length === 1 ? '' : 's'} held on this device.</p></div><a class="button primary" href="#new">${icon('new')} New quote</a></header>
+  app.innerHTML = shell(`<header class="page-head"><div><span class="eyebrow">Decision control</span><h1>Quote log</h1><p>${quotes.length} quote${quotes.length === 1 ? '' : 's'} held on this device.</p></div><a class="button primary" href="${appPath('new')}">${icon('new')} New quote</a></header>
     <section class="signal-row" aria-label="Quote totals"><div><b>${counts.draft + counts.ready}</b><span>Before send</span></div><div><b>${counts.sent + counts.expired}</b><span>Awaiting</span></div><div><b>${counts.accepted}</b><span>Accepted</span></div><div><b>${counts.declined}</b><span>Declined</span></div></section>
     <section class="quote-list" aria-labelledby="log-heading"><div class="section-heading"><div><span class="station-code">LOCAL REGISTER</span><h2 id="log-heading">Recent quotes</h2></div><label class="search"><span>Filter quotes</span><input id="filter" type="search" placeholder="Client, project, or number"></label></div>
       <div id="quote-rows">${quotes.map(quoteRow).join('')}</div><p id="no-results" class="empty-line" hidden>No quotes match that filter.</p>
@@ -112,7 +163,7 @@ function dashboard(): void {
 function quoteRow(quote: Quote): string {
   const snapshot = currentSnapshot(quote);
   const status = quoteStatus(quote);
-  return `<a class="quote-row" href="#quote/${quote.id}" data-search="${escapeHtml(`${snapshot.number} ${snapshot.clientName} ${snapshot.project}`.toLowerCase())}">
+  return `<a class="quote-row" href="${appPath(`quote/${quote.id}`)}" data-search="${escapeHtml(`${snapshot.number} ${snapshot.clientName} ${snapshot.project}`.toLowerCase())}">
     <span class="status-symbol status-${status}" aria-hidden="true">${status === 'accepted' ? '✓' : status === 'declined' ? '×' : status === 'expired' ? '!' : '•'}</span>
     <span class="quote-main"><strong>${escapeHtml(snapshot.project)}</strong><small>${escapeHtml(snapshot.clientName)} · ${escapeHtml(snapshot.number)}</small></span>
     <span class="quote-value">${escapeHtml(money(snapshot.totalCents, snapshot.currency))}<small>Expires ${escapeHtml(dateLabel(snapshot.expiresOn))}</small></span>
@@ -124,12 +175,12 @@ function quoteForm(existing?: Quote): void {
   const snapshot = existing ? currentSnapshot(existing) : null;
   const today = new Date();
   today.setDate(today.getDate() + 30);
-  if (!existing && quotes.length >= FREE_LIMIT && !isUnlocked()) { paywall(); return; }
-  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${existing ? `#quote/${existing.id}` : '#home'}">← Back</a><span class="eyebrow">${existing ? `Version ${existing.currentVersion}` : 'New route'}</span><h1>${existing ? 'Edit quote' : 'Create a quote'}</h1><p>${existing ? 'Saving a changed reviewed quote creates a new version and clears approval.' : 'Capture the commercial promise. You can review it next.'}</p></div></header>
+  if (!existing && quotes.length >= FREE_LIMIT && !hasUnlimitedQuotes()) { paywall(); return; }
+  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${existing ? appPath(`quote/${existing.id}`) : appPath()}">← Back</a><span class="eyebrow">${existing ? `Version ${existing.currentVersion}` : 'New route'}</span><h1>${existing ? 'Edit quote' : 'Create a quote'}</h1><p>${existing ? 'Saving a changed reviewed quote creates a new version and clears approval.' : 'Capture the commercial promise. You can review it next.'}</p></div></header>
     <form id="quote-form" class="form-panel" novalidate>
       <div class="form-section"><span class="station-code">IDENTITY</span><h2>Quote and client</h2><div class="field-grid three"><label>Quote number<input name="number" required maxlength="200" aria-describedby="number-error" value="${escapeHtml(snapshot?.number ?? `Q-${new Date().getFullYear()}-${String(quotes.length + 1).padStart(3, '0')}`)}"><span class="field-error" id="number-error" hidden>Enter a quote number, not only spaces.</span></label><label>Client name<input name="clientName" autocomplete="organization" required maxlength="500" aria-describedby="clientName-error" value="${escapeHtml(snapshot?.clientName)}"><span class="field-error" id="clientName-error" hidden>Enter a client name, not only spaces.</span></label><label>Client email <span>(optional)</span><input name="clientEmail" type="email" autocomplete="email" maxlength="500" value="${escapeHtml(snapshot?.clientEmail)}"></label></div></div>
       <div class="form-section"><span class="station-code">COMMITMENT</span><h2>Work and value</h2><div class="field-grid"><label>Project<input name="project" required maxlength="500" aria-describedby="project-error" value="${escapeHtml(snapshot?.project)}"><span class="field-error" id="project-error" hidden>Enter a project name, not only spaces.</span></label><label>Expiry date<input name="expiresOn" type="date" required value="${escapeHtml(snapshot?.expiresOn ?? today.toISOString().slice(0, 10))}"></label><label>Currency<select name="currency"><option>USD</option><option>EUR</option><option>GBP</option><option>INR</option><option>AUD</option><option>CAD</option></select></label><label>Total amount<input name="amount" type="number" min="0" max="${MAX_SAFE_AMOUNT}" step="0.01" inputmode="decimal" required aria-describedby="amount-error" value="${snapshot ? (snapshot.totalCents / 100).toFixed(2) : ''}"><span class="field-error" id="amount-error" hidden>Enter an amount up to ${MAX_SAFE_AMOUNT}; larger amounts cannot be stored safely.</span></label></div><label>Scope and deliverables<textarea name="scope" required maxlength="50000" rows="7" aria-describedby="scope-error">${escapeHtml(snapshot?.scope)}</textarea><span class="field-error" id="scope-error" hidden>Describe the scope; spaces alone cannot be saved.</span></label><label>Terms or assumptions <span>(optional)</span><textarea name="terms" maxlength="50000" rows="4">${escapeHtml(snapshot?.terms)}</textarea></label></div>
-      <div id="form-error" class="form-error" role="alert" hidden></div><div class="form-actions"><button class="button primary" type="submit">${existing ? 'Save version' : 'Save quote'} ${icon('arrow')}</button><a class="button secondary" href="${existing ? `#quote/${existing.id}` : '#home'}">Cancel</a></div>
+      <div id="form-error" class="form-error" role="alert" hidden></div><div class="form-actions"><button class="button primary" type="submit">${existing ? 'Save version' : 'Save quote'} ${icon('arrow')}</button><a class="button secondary" href="${existing ? appPath(`quote/${existing.id}`) : appPath()}">Cancel</a></div>
     </form>`, existing ? 'home' : 'new');
   const currency = document.querySelector<HTMLSelectElement>('[name="currency"]');
   if (currency && snapshot) currency.value = snapshot.currency;
@@ -169,13 +220,13 @@ async function saveQuote(event: SubmitEvent, existing?: Quote): Promise<void> {
   try {
     const digest = await digestSnapshot(snapshot);
     const now = new Date().toISOString();
-    if (existing && existing.versions.some((version) => version.digest === digest)) { location.hash = `quote/${existing.id}`; setToast('No changes to save.'); return; }
+    if (existing && existing.versions.some((version) => version.digest === digest)) { navigate(`quote/${existing.id}`); setToast('No changes to save.'); return; }
     const version = existing ? existing.currentVersion + 1 : 1;
     const quote: Quote = existing ? { ...existing, updatedAt: now, currentVersion: version, versions: [...existing.versions, { version, createdAt: now, digest, snapshot }], review: undefined, sentAt: undefined, decisionHistory: existing.decision ? [...(existing.decisionHistory ?? []), existing.decision] : existing.decisionHistory, decision: undefined } : { id: crypto.randomUUID(), createdAt: now, updatedAt: now, currentVersion: 1, versions: [{ version: 1, createdAt: now, digest, snapshot }] };
     validateQuote(quote, 'This quote');
     await quoteStore.put(quote);
     await refreshQuotes();
-    location.hash = `quote/${quote.id}`;
+    navigate(`quote/${quote.id}`);
     setToast(existing ? 'New version saved; review is required again.' : 'Quote saved. Review it before sending.');
   } catch (caught) { error.hidden = false; error.textContent = caught instanceof Error ? caught.message : 'The quote could not be saved.'; }
 }
@@ -192,10 +243,10 @@ function quoteDetail(quote: Quote): void {
       : status === 'sent' || status === 'expired'
         ? `<button class="button primary" data-open-share>View decision link</button><button class="button secondary" data-import-receipt>Import decision receipt</button>`
         : `<button class="button primary" data-export-receipt>${icon('download')} Export decision receipt</button>`;
-  app.innerHTML = shell(`<header class="page-head quote-head"><div><a class="back-link" href="#home">← Quote log</a><span class="eyebrow">${escapeHtml(snapshot.number)} · Version ${quote.currentVersion}</span><h1>${escapeHtml(snapshot.project)}</h1><p>Prepared for ${escapeHtml(snapshot.clientName)}.</p></div><span class="status-pill large status-${status}">${escapeHtml(statusLabel(status))}</span></header>
+  app.innerHTML = shell(`<header class="page-head quote-head"><div><a class="back-link" href="${appPath()}">← Quote log</a><span class="eyebrow">${escapeHtml(snapshot.number)} · Version ${quote.currentVersion}</span><h1>${escapeHtml(snapshot.project)}</h1><p>Prepared for ${escapeHtml(snapshot.clientName)}.</p></div><span class="status-pill large status-${status}">${escapeHtml(statusLabel(status))}</span></header>
     ${workflow(active)}
     <div class="quote-layout"><section class="paper" aria-labelledby="quote-summary"><div class="paper-top"><div><span class="station-code">QUOTE ${escapeHtml(snapshot.number)}</span><h2 id="quote-summary">${escapeHtml(snapshot.project)}</h2><p>For ${escapeHtml(snapshot.clientName)}${snapshot.clientEmail ? ` · ${escapeHtml(snapshot.clientEmail)}` : ''}</p></div><strong class="total">${escapeHtml(money(snapshot.totalCents, snapshot.currency))}</strong></div><div class="paper-meta"><span><b>Version</b>${quote.currentVersion}</span><span><b>Expires</b>${escapeHtml(dateLabel(snapshot.expiresOn))}</span><span><b>Fingerprint</b><code title="Full fingerprint: ${version.digest}">${version.digest.slice(0, 12)}…</code></span></div><div class="scope"><h3>Scope and deliverables</h3><p>${escapeHtml(snapshot.scope).replaceAll('\n', '<br>')}</p>${snapshot.terms ? `<h3>Terms and assumptions</h3><p>${escapeHtml(snapshot.terms).replaceAll('\n', '<br>')}</p>` : ''}</div></section>
-      <aside class="dispatch"><span class="station-code">DISPATCH DESK</span><h2>Next stop</h2>${dispatchCopy(quote, status)}<div class="action-stack">${nextAction}</div><div class="minor-actions"><a href="#edit/${quote.id}">Edit quote</a><button type="button" class="link-button danger-link" data-delete-quote>Delete quote</button></div></aside>
+      <aside class="dispatch"><span class="station-code">DISPATCH DESK</span><h2>Next stop</h2>${dispatchCopy(quote, status)}<div class="action-stack">${nextAction}</div><div class="minor-actions"><a href="${appPath(`edit/${quote.id}`)}">Edit quote</a><button type="button" class="link-button danger-link" data-delete-quote>Delete quote</button></div></aside>
     </div>
     ${quote.review ? `<section class="audit"><span class="audit-mark">✓</span><div><span class="station-code">INTERNAL REVIEW</span><h2>Cleared by ${escapeHtml(quote.review.reviewer)}</h2><p>Version ${quote.review.version} reviewed ${escapeHtml(dateLabel(quote.review.reviewedAt))}. Checked scope, price, and delivery assumptions.</p></div></section>` : ''}
     ${quote.decision ? decisionPanel(quote.decision) : ''}
@@ -225,7 +276,7 @@ function decisionPanel(decision: Decision): string {
 
 function reviewScreen(quote: Quote): void {
   const snapshot = currentSnapshot(quote);
-  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="#quote/${quote.id}">← Quote ${escapeHtml(snapshot.number)}</a><span class="eyebrow">Internal checkpoint · Version ${quote.currentVersion}</span><h1>Review before sending</h1><p>Confirm the exact scope, price, and assumptions below. All checks are required.</p></div></header>${workflow(0)}
+  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${appPath(`quote/${quote.id}`)}">← Quote ${escapeHtml(snapshot.number)}</a><span class="eyebrow">Internal checkpoint · Version ${quote.currentVersion}</span><h1>Review before sending</h1><p>Confirm the exact scope, price, and assumptions below. All checks are required.</p></div></header>${workflow(0)}
     <div class="review-layout"><section class="review-sheet"><span class="station-code">REVIEW COPY</span><h2>${escapeHtml(snapshot.project)}</h2><dl><div><dt>Client</dt><dd>${escapeHtml(snapshot.clientName)}</dd></div><div><dt>Total</dt><dd>${escapeHtml(money(snapshot.totalCents, snapshot.currency))}</dd></div><div><dt>Expiry</dt><dd>${escapeHtml(dateLabel(snapshot.expiresOn))}</dd></div></dl><h3>Scope</h3><p>${escapeHtml(snapshot.scope).replaceAll('\n', '<br>')}</p>${snapshot.terms ? `<h3>Terms</h3><p>${escapeHtml(snapshot.terms).replaceAll('\n', '<br>')}</p>` : ''}</section>
       <form id="review-form" class="checkpoint"><span class="station-code">CLEARANCE</span><h2>Three-point check</h2><label class="check-row"><input type="checkbox" name="checks" value="scope" required><span><b>Scope is complete</b>The deliverables match what the client expects.</span></label><label class="check-row"><input type="checkbox" name="checks" value="price" required><span><b>Price and expiry are correct</b>The commercial details are ready to stand behind.</span></label><label class="check-row"><input type="checkbox" name="checks" value="assumptions" required><span><b>Assumptions are visible</b>Dependencies and boundaries are not hidden.</span></label><label class="reviewer">Reviewer name<input name="reviewer" autocomplete="name" required minlength="2" maxlength="500"></label><p class="fine-print">Your name records an internal approval for this version. It is not a legal signature.</p><button class="button primary wide" type="submit">${icon('check')} Mark send-ready</button></form></div>`, 'home');
   document.querySelector<HTMLFormElement>('#review-form')?.addEventListener('submit', (event) => void approveQuote(event, quote));
@@ -254,7 +305,7 @@ async function shareScreen(quote: Quote): Promise<void> {
   const version = quote.versions.find((item) => item.version === quote.currentVersion)!;
   const payload: SharePayload = { schema: 1, quoteId: quote.id, version: version.version, digest: version.digest, issuedAt: new Date().toISOString(), snapshot: version.snapshot };
   const url = `${location.origin}${location.pathname}#client/${encodeShare(payload)}`;
-  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="#quote/${quote.id}">← Quote ${escapeHtml(version.snapshot.number)}</a><span class="eyebrow">Dispatch · Version ${quote.currentVersion}</span><h1>Send the reviewed version</h1><p>This link carries the quote itself. No account or network request is needed to read it.</p></div></header>${workflow(quote.sentAt ? 2 : 1)}
+  app.innerHTML = shell(`<header class="page-head"><div><a class="back-link" href="${appPath(`quote/${quote.id}`)}">← Quote ${escapeHtml(version.snapshot.number)}</a><span class="eyebrow">Dispatch · Version ${quote.currentVersion}</span><h1>Send the reviewed version</h1><p>This link carries the quote itself. No account or network request is needed to read it.</p></div></header>${workflow(quote.sentAt ? 2 : 1)}
     <section class="share-panel"><div class="share-copy"><span class="station-code">CLIENT LINK</span><h2>Ready for ${escapeHtml(version.snapshot.clientName)}</h2><p>The fingerprint in this link matches the version reviewed by ${escapeHtml(quote.review.reviewer)}. If any quote detail changes, this approval and link are retired.</p><label>Private decision link<textarea id="share-url" readonly rows="5">${escapeHtml(url)}</textarea></label><div class="button-row"><button class="button primary" data-copy-link>${icon('copy')} Copy client link</button><a class="button secondary" href="${escapeHtml(url)}" target="_blank">Preview client page</a></div></div>
       <div class="ticket"><span>VERSION</span><b>${quote.currentVersion}</b><span>FINGERPRINT</span><code>${version.digest.slice(0, 16)}</code><span>EXPIRES</span><strong>${escapeHtml(dateLabel(version.snapshot.expiresOn))}</strong></div></section>
     <section class="send-confirm"><div><span class="station-code">FINAL STOP</span><h2>${quote.sentAt ? 'Marked as sent' : 'Mark it sent when it leaves'}</h2><p>${quote.sentAt ? `Sent ${escapeHtml(dateLabel(quote.sentAt))}. Waiting for a portable client receipt.` : 'Copy the link into your own email or message. Quote Decision does not contact the client or upload the quote.'}</p></div>${quote.sentAt ? `<button class="button secondary" data-import-receipt>Import client receipt</button>` : `<button class="button primary" data-mark-sent>Mark as sent ${icon('arrow')}</button>`}</section>
@@ -285,7 +336,7 @@ async function clientPage(encoded: string): Promise<void> {
   const expired = new Date(`${snapshot.expiresOn}T23:59:59`).getTime() < Date.now();
   const localQuote = quotes.find((quote) => quote.id === payload.quoteId);
   const existingDecision = localQuote?.decision?.digest === payload.digest ? localQuote.decision : undefined;
-  app.innerHTML = `<main id="main" class="client-main"><header class="client-brand"><a class="brand" href="#home" aria-label="Quote Decision home"><span class="brand-mark">QD</span><span>Quote<br>Decision</span></a><span class="verified">✓ Fingerprint verified</span></header>
+  app.innerHTML = `<main id="main" class="client-main"><header class="client-brand"><a class="brand" href="${appPath()}" aria-label="Quote Decision home"><span class="brand-mark">QD</span><span>Quote<br>Decision</span></a><span class="verified">✓ Fingerprint verified</span></header>
     <article class="client-quote"><div class="client-title"><div><span class="eyebrow">Decision requested · Quote ${escapeHtml(snapshot.number)}</span><h1>${escapeHtml(snapshot.project)}</h1><p>Prepared for ${escapeHtml(snapshot.clientName)}</p></div><strong>${escapeHtml(money(snapshot.totalCents, snapshot.currency))}</strong></div>
       <div class="client-meta"><span><b>Version</b>${payload.version}</span><span><b>Expires</b>${escapeHtml(dateLabel(snapshot.expiresOn))}</span><span><b>Fingerprint</b><code>${payload.digest.slice(0, 12)}…</code></span></div>
       ${expired ? '<div class="notice danger-notice"><b>This quote has expired.</b> You can review it, but a new decision cannot be recorded. Ask the sender for an updated quote.</div>' : ''}
@@ -341,7 +392,7 @@ async function importReceiptFile(event: Event): Promise<void> {
     if (quote.currentVersion === decision.version) quote.decision = decision;
     else if (!prior) quote.decisionHistory = [...(quote.decisionHistory ?? []), decision];
     quote.updatedAt = new Date().toISOString();
-    await quoteStore.put(quote); await refreshQuotes(); location.hash = `quote/${quote.id}`; quoteDetail(quote); setToast(`Client decision imported: ${decision.decision}.`);
+    await quoteStore.put(quote); await refreshQuotes(); navigate(`quote/${quote.id}`); setToast(`Client decision imported: ${decision.decision}.`);
   } catch (caught) { setToast(caught instanceof Error ? caught.message : 'The receipt could not be imported.'); }
   input.value = '';
 }
@@ -349,14 +400,16 @@ async function importReceiptFile(event: Event): Promise<void> {
 async function deleteQuote(quote: Quote): Promise<void> {
   const snapshot = currentSnapshot(quote);
   if (!confirm(`Delete quote ${snapshot.number} for ${snapshot.clientName}? This cannot be undone unless you exported a backup.`)) return;
-  await quoteStore.remove(quote.id); await refreshQuotes(); location.hash = 'home'; setToast('Quote deleted from this device.');
+  await quoteStore.remove(quote.id); await refreshQuotes(); navigate('home'); setToast('Quote deleted from this device.');
 }
 
 function dataPage(): void {
-  const unlocked = isUnlocked();
+  const unlocked = hasUnlimitedQuotes();
+  const accessPanel = demoMode
+    ? `<section class="settings-panel license-panel"><span class="station-code">DEMO STORAGE</span><h2>Sample data only</h2><p>These two sample quotes use the separate demo database. Reset the demo to restore them, or start for real to use your own empty quote log.</p><div class="button-row"><button class="button secondary" type="button" data-reset-demo>Reset demo</button><a class="button primary" href="/">Start for real</a></div></section>`
+    : `<section class="settings-panel license-panel"><span class="station-code">ONE-TIME UNLOCK</span><h2>${unlocked ? 'Unlimited is active' : 'Keep every quote moving'}</h2><p>${unlocked ? 'This device has a valid cached license. Thank you for supporting a focused, private tool.' : `The free edition handles ${FREE_LIMIT} active quotes end to end. A $19 one-time purchase unlocks unlimited quotes and future v1 updates—no subscription.`}</p>${unlocked ? `<button class="button secondary" data-verify-license>Verify license now</button><button class="link-button danger-link" data-remove-license>Remove from this device</button>` : `<a class="button primary" href="${checkoutUrl}">Buy unlimited — $19</a><form id="license-form"><label>Have a license? Paste it here<input name="license" autocomplete="off" required></label><button class="button secondary" type="submit">Restore purchase</button></form>`}<p class="fine-print">Checkout is hosted by Sociobot. Dodo is the merchant of record; refunds are handled there and revoke the license. <a href="/terms/">Terms</a> apply.</p><div id="license-status" role="status"></div></section>`;
   app.innerHTML = shell(`<header class="page-head"><div><span class="eyebrow">Ownership & access</span><h1>Data and license</h1><p>Back up the whole log, move decisions between devices, or remove everything.</p></div></header>
-    <div class="settings-grid"><section class="settings-panel"><span class="station-code">YOUR DATA</span><h2>Portable by design</h2><p>Quotes live in this browser’s IndexedDB. Export a JSON backup for restoration or a CSV overview for your records.</p>${storageError ? `<div class="notice" role="alert"><b>Local data needs recovery.</b><p>${escapeHtml(storageError)} Import a valid backup to replace it, or delete the invalid local data below.</p></div>` : ''}<div class="button-row"><button class="button primary" data-export-json ${storageError ? 'disabled' : ''}>${icon('download')} Export JSON</button><button class="button secondary" data-export-csv ${storageError ? 'disabled' : ''}>Export CSV</button><button class="button secondary" data-import-backup>Import backup</button></div><input id="backup-file" type="file" accept="application/json,.json" hidden><hr><h3>Delete local data</h3><p>${storageError ? 'Removes the unreadable local quote data from this device.' : `Removes all ${quotes.length} quote${quotes.length === 1 ? '' : 's'} from this device. Export first if you might need them.`}</p><button class="button danger" data-delete-all>${storageError ? 'Delete invalid local data' : 'Delete all quotes'}</button></section>
-      <section class="settings-panel license-panel"><span class="station-code">ONE-TIME UNLOCK</span><h2>${unlocked ? 'Unlimited is active' : 'Keep every quote moving'}</h2><p>${unlocked ? 'This device has a valid cached license. Thank you for supporting a focused, private tool.' : `The free edition handles ${FREE_LIMIT} active quotes end to end. A $19 one-time purchase unlocks unlimited quotes and future v1 updates—no subscription.`}</p>${unlocked ? `<button class="button secondary" data-verify-license>Verify license now</button><button class="link-button danger-link" data-remove-license>Remove from this device</button>` : `<a class="button primary" href="${checkoutUrl}">Buy unlimited — $19</a><form id="license-form"><label>Have a license? Paste it here<input name="license" autocomplete="off" required></label><button class="button secondary" type="submit">Restore purchase</button></form>`}<p class="fine-print">Checkout is hosted by Sociobot. Dodo is the merchant of record; refunds are handled there and revoke the license. <a href="/terms/">Terms</a> apply.</p><div id="license-status" role="status"></div></section></div>`, 'data');
+    <div class="settings-grid"><section class="settings-panel"><span class="station-code">YOUR DATA</span><h2>Portable by design</h2><p>${demoMode ? 'Sample quotes live in the demo browser database. Export a JSON backup or CSV overview to inspect the same controls.' : 'Quotes live in this browser’s IndexedDB. Export a JSON backup for restoration or a CSV overview for your records.'}</p>${storageError ? `<div class="notice" role="alert"><b>Local data needs recovery.</b><p>${escapeHtml(storageError)} Import a valid backup to replace it, or delete the invalid local data below.</p></div>` : ''}<div class="button-row"><button class="button primary" data-export-json ${storageError ? 'disabled' : ''}>${icon('download')} Export JSON</button><button class="button secondary" data-export-csv ${storageError ? 'disabled' : ''}>Export CSV</button><button class="button secondary" data-import-backup>Import backup</button></div><input id="backup-file" type="file" accept="application/json,.json" hidden><hr><h3>Delete local data</h3><p>${storageError ? 'Removes the unreadable local quote data from this device.' : `Removes all ${quotes.length} quote${quotes.length === 1 ? '' : 's'} from this device. Export first if you might need them.`}</p><button class="button danger" data-delete-all>${storageError ? 'Delete invalid local data' : 'Delete all quotes'}</button></section>${accessPanel}</div>`, 'data');
   document.querySelector('[data-export-json]')?.addEventListener('click', exportJson);
   document.querySelector('[data-export-csv]')?.addEventListener('click', exportCsv);
   document.querySelector('[data-import-backup]')?.addEventListener('click', () => document.querySelector<HTMLInputElement>('#backup-file')?.click());
@@ -401,12 +454,24 @@ async function restoreLicense(event: SubmitEvent): Promise<void> {
 
 async function checkLicense(force = false): Promise<void> {
   const status = document.querySelector<HTMLDivElement>('#license-status'); if (status) status.textContent = 'Verifying license…';
-  try { const result = await verifyLicense(force); if (result.valid) { dataPage(); setToast('License verified. Unlimited quotes are active.'); } else { if (status) status.textContent = 'License no longer active. You can purchase a new unlock below.'; } }
+  try {
+    const result = await verifyLicense(force);
+    if (result.valid) { dataPage(); setToast('License verified. Unlimited quotes are active.'); }
+    else {
+      dataPage();
+      document.querySelector<HTMLDivElement>('#license-status')!.textContent = 'License no longer active. You can purchase a new unlock below.';
+    }
+  }
   catch { if (status) status.textContent = 'Could not verify while offline. Your last valid unlock remains available.'; }
 }
 
 function paywall(): void {
-  app.innerHTML = shell(`<section class="empty compact"><span class="station-code">FREE EDITION · ${FREE_LIMIT}/${FREE_LIMIT}</span><h1>Your free log is full</h1><p>You can still review, send, decide, export, and delete existing quotes. Unlock unlimited quotes for a $19 one-time purchase.</p><div class="button-row centered"><a class="button primary" href="${checkoutUrl}">Buy unlimited — $19</a><a class="button secondary" href="#data">Restore a license</a></div><a class="back-link" href="#home">← Return to quote log</a></section>`, 'new');
+  if (demoMode) {
+    app.innerHTML = shell(`<section class="empty compact"><span class="station-code">DEMO LIMIT · ${FREE_LIMIT}/${FREE_LIMIT}</span><h1>The sample log is full</h1><p>Reset the demo to restore the two sample quotes, or start for real to create your own quote log.</p><div class="button-row centered"><button class="button primary" type="button" data-reset-demo>Reset demo</button><a class="button secondary" href="/">Start for real</a></div></section>`, 'new');
+    bindShared();
+    return;
+  }
+  app.innerHTML = shell(`<section class="empty compact"><span class="station-code">FREE EDITION · ${FREE_LIMIT}/${FREE_LIMIT}</span><h1>Your free log is full</h1><p>You can still review, send, decide, export, and delete existing quotes. Unlock unlimited quotes for a $19 one-time purchase.</p><div class="button-row centered"><a class="button primary" href="${checkoutUrl}">Buy unlimited — $19</a><a class="button secondary" href="${appPath('data')}">Restore a license</a></div><a class="back-link" href="${appPath()}">← Return to quote log</a></section>`, 'new');
   bindShared();
 }
 
@@ -417,6 +482,9 @@ async function copyText(value: string, message: string): Promise<void> {
 
 function bindShared(): void {
   updateNetworkState();
+  document.querySelectorAll<HTMLButtonElement>('[data-reset-demo]').forEach((button) => {
+    button.addEventListener('click', () => void resetDemo());
+  });
 }
 
 function updateNetworkState(): void {
@@ -430,24 +498,111 @@ async function refreshQuotes(): Promise<void> {
   quotes = (await quoteStore.all()).map((quote, index) => validateQuote(quote, `Stored quote ${index + 1}`));
 }
 
-function route(): void {
+async function seedDemoData(): Promise<void> {
+  if (!demoMode || quotes.length) return;
+  const now = new Date().toISOString();
+  const future = new Date();
+  future.setDate(future.getDate() + 30);
+  const later = new Date();
+  later.setDate(later.getDate() + 45);
+  const acceptedSnapshot: QuoteSnapshot = {
+    number: 'QD-2047', clientName: 'Cedar & Kite', clientEmail: 'hello@cedarandkite.example', project: 'Product photography', currency: 'USD', totalCents: 210000,
+    expiresOn: future.toISOString().slice(0, 10), scope: 'Plan a half-day studio shoot, deliver 24 edited product images, and provide web-ready exports.', terms: 'Two revision notes are included. Extra retouching is quoted separately.',
+  };
+  const readySnapshot: QuoteSnapshot = {
+    number: 'QD-2048', clientName: 'Harrow & Vale', clientEmail: 'studio@harrowvale.example', project: 'Website launch', currency: 'USD', totalCents: 480000,
+    expiresOn: later.toISOString().slice(0, 10), scope: 'Design and build a five-page launch site with a contact form, analytics-free hosting handoff, and editor training.', terms: 'Client supplies final copy and photography before build starts.',
+  };
+  const acceptedDigest = await digestSnapshot(acceptedSnapshot);
+  const readyDigest = await digestSnapshot(readySnapshot);
+  const decision: Decision = {
+    quoteId: 'demo-cedar-kite', version: 1, digest: acceptedDigest, decision: 'accepted', clientName: 'Avery Cole', decidedAt: now,
+    consentText: CONSENT_TEXT, note: 'Please schedule the shoot for the second week of next month.',
+  };
+  decision.receiptDigest = await digestDecision(decision);
+  const checked = ['assumptions', 'price', 'scope'];
+  const accepted: Quote = {
+    id: 'demo-cedar-kite', createdAt: now, updatedAt: now, currentVersion: 1,
+    versions: [{ version: 1, createdAt: now, digest: acceptedDigest, snapshot: acceptedSnapshot }],
+    review: { version: 1, reviewer: 'Mira Chen', reviewedAt: now, checks: checked }, sentAt: now, decision,
+  };
+  const ready: Quote = {
+    id: 'demo-harrow-vale', createdAt: now, updatedAt: now, currentVersion: 1,
+    versions: [{ version: 1, createdAt: now, digest: readyDigest, snapshot: readySnapshot }],
+    review: { version: 1, reviewer: 'Mira Chen', reviewedAt: now, checks: checked },
+  };
+  await quoteStore.put(accepted);
+  await quoteStore.put(ready);
+  await refreshQuotes();
+}
+
+async function resetDemo(): Promise<void> {
+  if (!demoMode) return;
+  await quoteStore.clear();
+  quotes = [];
+  await seedDemoData();
+  navigate('home');
+  setToast('Demo reset with two sample quotes.');
+}
+
+function route(moveFocus = false): void {
   const hash = location.hash.slice(1) || 'home';
   // The global skip link points at the current main landmark. It is an anchor,
   // not an application route; rerendering here steals focus from keyboard users.
   if (hash === 'main' && document.querySelector('#main')) return;
-  if (hash.startsWith('client/')) { void clientPage(hash.slice(7)); return; }
-  if (hash === 'home') dashboard();
-  else if (hash === 'new') quoteForm();
-  else if (hash === 'data') dataPage();
-  else if (hash.startsWith('quote/')) { const quote = quotes.find((item) => item.id === hash.slice(6)); quote ? quoteDetail(quote) : dashboard(); }
-  else if (hash.startsWith('edit/')) { const quote = quotes.find((item) => item.id === hash.slice(5)); quote ? quoteForm(quote) : dashboard(); }
-  else dashboard();
-  requestAnimationFrame(() => document.querySelector<HTMLElement>('#main')?.focus({ preventScroll: true }));
+  if (hash.startsWith('client/')) {
+    setDocumentDetails('Client decision — Quote Decision', 'Review a shared quote and record a clear answer.');
+    void clientPage(hash.slice(7));
+    return;
+  }
+  // Keep links made by the first release usable, but move visitors to the
+  // real URL immediately so titles, canonical URLs, and browser history agree.
+  if (location.hash && (hash === 'home' || hash === 'new' || hash === 'data' || hash.startsWith('quote/') || hash.startsWith('edit/'))) {
+    history.replaceState(null, '', appPath(hash as AppRoute));
+  }
+  const appRoute = currentRoute();
+  if (appRoute === 'home') {
+    setDocumentDetails(demoMode ? 'Demo — Quote Decision' : 'Quote Decision — review quotes before sending', demoMode ? 'Try Quote Decision with isolated sample quotes.' : 'Review quotes before they leave and preserve the client decision.');
+    dashboard();
+  } else if (appRoute === 'new') {
+    setDocumentDetails('New quote — Quote Decision', 'Create a quote for review before it is sent.');
+    quoteForm();
+  } else if (appRoute === 'data') {
+    setDocumentDetails('Data and license — Quote Decision', 'Export, import, or remove your local quote log.');
+    dataPage();
+  } else if (appRoute.startsWith('quote/')) {
+    const quote = quotes.find((item) => item.id === appRoute.slice(6));
+    if (quote) {
+      setDocumentDetails(`${currentSnapshot(quote).number} — Quote Decision`, 'Review a saved quote and its decision record.');
+      quoteDetail(quote);
+    } else {
+      setDocumentDetails('Quote log — Quote Decision', 'Review quotes before they leave and preserve the client decision.');
+      dashboard();
+    }
+  } else if (appRoute.startsWith('edit/')) {
+    const quote = quotes.find((item) => item.id === appRoute.slice(5));
+    if (quote) {
+      setDocumentDetails(`Edit ${currentSnapshot(quote).number} — Quote Decision`, 'Update a saved quote before review.');
+      quoteForm(quote);
+    } else dashboard();
+  }
+  if (moveFocus) requestAnimationFrame(() => {
+    const heading = document.querySelector<HTMLElement>('#main h1');
+    if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+  });
 }
 
 async function registerServiceWorker(): Promise<void> {
   if (!('serviceWorker' in navigator) || !import.meta.env.PROD) return;
-  const registration = await navigator.serviceWorker.register('/sw.js');
+  let registration: ServiceWorkerRegistration | undefined;
+  try {
+    registration = await navigator.serviceWorker.register('/sw.js');
+  } catch {
+    // Some privacy tools deliberately block workers. The local app remains
+    // usable without offline caching, so registration must fail silently.
+    return;
+  }
+  if (!registration) return;
   let acceptingUpdate = false;
   if (registration.waiting) showUpdate(registration, () => { acceptingUpdate = true; });
   registration.addEventListener('updatefound', () => {
@@ -463,16 +618,34 @@ function showUpdate(registration: ServiceWorkerRegistration, beforeAccept: () =>
 }
 
 async function boot(): Promise<void> {
-  const returned = captureReturnedLicense();
+  const returned = !demoMode && captureReturnedLicense();
   try { await refreshQuotes(); storageError = ''; }
   catch (caught) { storageError = caught instanceof Error ? caught.message : 'Unknown storage error.'; }
+  if (!storageError) await seedDemoData();
   route();
   if (returned) { setToast('License saved. Verifying your unlimited unlock…'); void checkLicense(true); }
-  else if (licenseToken() && navigator.onLine) void verifyLicense().then((result) => { if (!result.valid) setToast('License no longer active. Free limits apply.'); }).catch(() => undefined);
+  else if (!demoMode && licenseToken() && navigator.onLine) void verifyLicense().then((result) => {
+    if (!result.valid) {
+      if (currentRoute() === 'data') dataPage();
+      setToast('License no longer active. Free limits apply.');
+    }
+  }).catch(() => undefined);
   void registerServiceWorker();
 }
 
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => route());
+window.addEventListener('popstate', () => route(true));
 window.addEventListener('online', updateNetworkState);
 window.addEventListener('offline', updateNetworkState);
+document.addEventListener('click', (event) => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const anchor = (event.target as Element | null)?.closest<HTMLAnchorElement>('a[href]');
+  if (!anchor || anchor.target || anchor.hasAttribute('download')) return;
+  const target = new URL(anchor.href, location.href);
+  if (target.origin !== location.origin || target.hash || target.search) return;
+  const destination = routeForCurrentMode(target.pathname);
+  if (!destination) return;
+  event.preventDefault();
+  navigate(destination);
+});
 void boot();

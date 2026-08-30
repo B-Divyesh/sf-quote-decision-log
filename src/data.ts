@@ -1,7 +1,9 @@
 import type { Decision, DecisionReceipt, ExportBundle, Quote, QuoteSnapshot, QuoteStatus, SharePayload } from './types';
 
-const DB_NAME = 'quote-decision-log';
+const REAL_DB_NAME = 'quote-decision-log';
+const DEMO_DB_NAME = 'demo:quote-decision-log';
 const STORE = 'quotes';
+let databaseName = REAL_DB_NAME;
 export const CONSENT_TEXT = 'I confirm I reviewed this exact quote version and intend to record the decision shown.';
 const SHA256 = /^[a-f0-9]{64}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -103,7 +105,7 @@ function openDatabase(): Promise<IDBDatabase> {
       reject(new Error('This browser does not provide local storage. Try a current browser.'));
       return;
     }
-    const request = indexedDB.open(DB_NAME, 1);
+    const request = indexedDB.open(databaseName, 1);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
@@ -111,6 +113,18 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error('Your local quote log could not be opened. Check browser storage permissions.'));
   });
+}
+
+/**
+ * Demo quotes must never share a database with a visitor's real quote log.
+ * This is called before the first storage read during application boot.
+ */
+export function useDemoQuoteStorage(demo: boolean): void {
+  databaseName = demo ? DEMO_DB_NAME : REAL_DB_NAME;
+}
+
+export function activeQuoteStorageName(): string {
+  return databaseName;
 }
 
 async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {

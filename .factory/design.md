@@ -105,3 +105,6 @@ photorealism, no extra symbols.”
 - `public/icons/icon.svg`, maskable/install PNGs, and UI glyphs: original
   geometric artwork authored in-repository for Quote Decision, MIT with the
   product.
+- `public/social-preview.jpg`: a 1200×630 crop derived from the same reviewed
+  dispatch-gate source art on 2026-08-30; no new imagery, text, brands, or
+  third-party asset was introduced.
