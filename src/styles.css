@@ -111,7 +111,6 @@ input::placeholder { color: #8fa0a0; }
 .field-error { color: var(--stop); font-size: 13px; line-height: 1.35; font-weight: 650; }
 .field-error[hidden] { display: none; }
 .button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
-.quote-list { content-visibility: auto; }
 .quote-row { display: grid; grid-template-columns: 42px minmax(160px, 1fr) minmax(140px, .45fr) auto 24px; align-items: center; gap: 16px; min-height: 88px; padding: 16px 12px; border-top: 1px solid var(--rule); text-decoration: none; }
 .quote-row:last-of-type { border-bottom: 1px solid var(--rule); }
 .quote-row:hover { background: var(--ink-900); }

@@ -1,0 +1,12 @@
+{
+  "performance": 97,
+  "accessibility": 100,
+  "bestPractices": 100,
+  "seo": 100,
+  "lcpMs": 1363.0888,
+  "cls": 0.1069808763540318,
+  "tbtMs": 0,
+  "mainThreadMs": 727.1360000000006,
+  "longestTaskMs": 161,
+  "note": "The candidate reproduced the verifier's exact deterministic CLS. The verifier's independent run scored 87 with 424 ms TBT."
+}

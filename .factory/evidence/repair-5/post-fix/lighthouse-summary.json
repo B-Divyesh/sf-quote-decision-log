@@ -1,0 +1,41 @@
+[
+  {
+    "performance": 100,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "fcpMs": 1106.3753,
+    "lcpMs": 1205.3753,
+    "cls": 0,
+    "tbtMs": 0,
+    "mainThreadMs": 840.3560000000003,
+    "longestTaskMs": 184,
+    "transferBytes": 53797
+  },
+  {
+    "performance": 100,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "fcpMs": 1053.2733,
+    "lcpMs": 1353.2733,
+    "cls": 0,
+    "tbtMs": 0,
+    "mainThreadMs": 787.3560000000003,
+    "longestTaskMs": 193,
+    "transferBytes": 53797
+  },
+  {
+    "performance": 100,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "fcpMs": 1054.7633,
+    "lcpMs": 1354.7633,
+    "cls": 0,
+    "tbtMs": 0,
+    "mainThreadMs": 712.8480000000005,
+    "longestTaskMs": 110,
+    "transferBytes": 53797
+  }
+]

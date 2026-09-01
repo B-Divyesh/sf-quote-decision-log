@@ -1,0 +1,11 @@
+{
+  "viewport": "390x844",
+  "cpuSlowdown": 4,
+  "cumulativeLayoutShift": 0,
+  "blockingTimeMs": 99,
+  "longTasksMs": [83, 116],
+  "budgets": {
+    "cumulativeLayoutShift": 0.05,
+    "blockingTimeMs": 200
+  }
+}

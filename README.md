@@ -52,6 +52,7 @@ npm run typecheck
 npm run lint
 npm run build
 npm run test:e2e
+npm run test:performance
 ```
 
 `npm run build` creates `dist/` with `dist/index.html` at its root. The browser
