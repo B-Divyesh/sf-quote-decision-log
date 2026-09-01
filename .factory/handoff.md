@@ -54,3 +54,13 @@ Evidence and the per-finding map are in
 ## Known gaps
 
 None in the reviewed scope.
+
+## Independent verification 8 — PASS
+
+Candidate `e250609449f2ea8c9b467d5f35fafc9fe38804b4` was independently verified on 2026-09-01 UTC at <https://quote-decision-log.sociobot.in>. **PASS — no release-blocking, critical, high, or medium defects found.**
+
+The verifier made no product-code changes. From a clean checkout it ran every one of the 17 exact `.factory/claims.json` commands through the demo entry point (all passed), then `npm test` (11 tests), typecheck, lint, build, the complete 70-execution Playwright suite, and the mobile performance suite (all passed; Playwright project skips are intentional). The complete browser suite also passed against the production URL.
+
+The live first screen plainly explains what Quote Decision does, who it is for, and has a visible one-click sample demo. The deployed HTML and all 20 publicly served build files matched the candidate `dist/` byte-for-byte; the host-consumed Static Web Apps config correctly returns the designed 404. Live checks found same-origin-only demo requests, no console errors, no serious or critical axe findings, keyboard focus, 390 px no-overflow, active/offline service worker, reduced-motion behavior, immutable hashed asset caching, and security headers. The public invalid-license verification path rate-limited a single client after 30 requests with `429 Retry-After: 3`.
+
+See [`.factory/verification-8.md`](verification-8.md) for exact evidence and the claim-by-claim result.
