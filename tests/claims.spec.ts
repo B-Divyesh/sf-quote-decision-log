@@ -256,8 +256,11 @@ test('@claim:unlimited-price displays the $19 one-time unlimited option and prod
   await page.getByRole('link', { name: 'Start for real' }).first().click();
   await page.goto('/data');
   const checkout = page.getByRole('link', { name: 'Open $19 checkout' });
+  const billingOrigin = new URL(page.url()).hostname === 'quote-decision-log.sociobot.in'
+    ? 'https://api.sociobot.in'
+    : 'https://pilot-api.sociobot.in';
   await expect(checkout).toBeVisible();
-  await expect(checkout).toHaveAttribute('href', 'https://pilot-api.sociobot.in/api/v1/products/quote-decision-log/checkout');
+  await expect(checkout).toHaveAttribute('href', `${billingOrigin}/api/v1/products/quote-decision-log/checkout`);
   await expect(page.getByText(/displays a \$19 one-time option for unlimited quotes/i)).toBeVisible();
 });
 
