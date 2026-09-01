@@ -1,0 +1,14 @@
+{
+  "url": "https://quote-decision-log.sociobot.in/demo",
+  "loadMs": 572,
+  "errors": [],
+  "a11y": {
+    "title": "Demo — Quote Decision",
+    "lang": "en",
+    "h1": 1,
+    "main": true,
+    "imgsMissingAlt": 0,
+    "buttonsUnlabeled": 0,
+    "textLength": 551
+  }
+}
