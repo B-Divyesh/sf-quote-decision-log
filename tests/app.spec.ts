@@ -332,7 +332,7 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   try {
     await ensureServiceWorkerControl(page);
     await writeFile(swPath, original.replaceAll('qd-shell-v5', 'qd-shell-v5-regression').replaceAll('qd-assets-v5', 'qd-assets-v5-regression'));
-    await page.evaluate(async () => { await (await navigator.serviceWorker.getRegistration())?.update(); });
+    await page.evaluate(async () => { await navigator.serviceWorker.register(`/sw.js?update-test=${Date.now()}`); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
     await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v5-regression'));

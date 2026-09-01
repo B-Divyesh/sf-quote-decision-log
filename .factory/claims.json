@@ -60,14 +60,14 @@
     "claim": "A client decision receipt records the exact consent text and typed client name.",
     "where": "client decision form and README",
     "test": "npm run test:e2e -- --grep @claim:decision-consent-record",
-    "sandbox": "fresh normal quote and separate clean client browser context; record a decision, read the downloaded receipt, and assert exact consent text and typed name"
+    "sandbox": "fresh /demo, then Start for real; create a normal quote and use a separate clean client context to assert exact consent text and typed name in the downloaded receipt"
   },
   {
     "id": "client-decision-retention",
     "claim": "A recorded client decision stays on that client's device.",
     "where": "client decision form and completion state",
     "test": "npm run test:e2e -- --grep @claim:client-decision-retention",
-    "sandbox": "create a normal quote; open its link in a genuinely separate clean 390px browser context; record a decision; assert the exact completion and repeat-download state immediately and after reload"
+    "sandbox": "fresh /demo, then Start for real; create a normal quote, open its link in a separate clean 390px client context, and assert decision retention after reload"
   },
   {
     "id": "backup-import",
@@ -81,14 +81,14 @@
     "claim": "Deletes all local quotes without changing demo data.",
     "where": "data screen, privacy page, and README",
     "test": "npm run test:e2e -- --grep @claim:delete-local-quotes",
-    "sandbox": "seed /demo, create one normal quote, confirm deletion, reload, assert normal IndexedDB is empty, then assert both demo samples remain"
+    "sandbox": "fresh /demo, then Start for real; create one normal quote, confirm deletion, reload, assert normal IndexedDB is empty, then assert both demo samples remain"
   },
   {
     "id": "delete-client-receipt",
     "claim": "A client can delete a saved local decision receipt.",
     "where": "client completion state, privacy page, and README",
     "test": "npm run test:e2e -- --grep @claim:delete-client-receipt",
-    "sandbox": "fresh normal quote and separate clean client browser context; record a decision, confirm receipt deletion, reload, and assert the receipt form returns and client receipt database is empty"
+    "sandbox": "fresh /demo, then Start for real; create a normal quote and use a separate clean client context to record, delete, reload, and assert the receipt database is empty"
   },
   {
     "id": "unlimited-price",
