@@ -19,5 +19,6 @@ banner has **Reset demo** to restore the two samples and **Start for real** to
 leave the sandbox. Leaving the demo discards no real data; its separate demo
 data remains available only until the next reset or browser-site-data cleanup.
 
-All claim tests use this seeded demo. It has the same quote review, receipt,
-export, offline, and free-limit behavior as the real product.
+Every claim test starts from this seeded demo entry point. Tests for real-data
+deletion and client receipts then use **Start for real** and a separate clean
+client context. This proves demo actions cannot read or change real records.

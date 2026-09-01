@@ -1,7 +1,8 @@
 # Quote Decision
 
 Quote Decision helps tiny agencies review a quote before sending it and keep a
-clear client decision trail. It is a local-first PWA.
+clear client decision trail. It keeps quote records in this browser and can
+work offline after the first visit.
 
 Try the shipped sample workspace at
 <https://quote-decision-log.sociobot.in/demo>. It starts with two realistic
@@ -12,13 +13,13 @@ quotes in a separate demo database. Use **Reset demo** to restore them or
 
 - keeps quote data in browser IndexedDB on the device;
 - shows a named review before a quote is send-ready;
-- puts the reviewed quote in a private client-link fragment;
+- puts the reviewed quote in a link you can send to the client;
 - exports portable JSON decision receipts;
 - retains a client's own receipt on that device for later download;
 - exports the whole log as JSON and a summary as CSV;
-- shows each saved version's SHA-256 fingerprint;
+- shows an unchangeable ID for each saved quote version;
 - works offline after the first visit;
-- supports five free quotes; a $19 one-time purchase unlocks unlimited quotes.
+- supports five free quotes and displays a $19 one-time unlimited option.
 
 Quote Decision is not a payment tool, document editor, or regulated electronic
 signature service. A decision receipt records explicit click consent and a
@@ -53,10 +54,9 @@ npm run build
 npm run test:e2e
 ```
 
-`npm run build` creates `dist/` with `dist/index.html` at its root. The pinned
-Playwright suite covers desktop, 390 px mobile, keyboard flow, accessibility,
-privacy requests, sample-demo claims, offline reload, service-worker update,
-data recovery, and the quote-to-decision workflow.
+`npm run build` creates `dist/` with `dist/index.html` at its root. The browser
+suite checks desktop and 390 px mobile layouts. It also checks keyboard use,
+privacy, demo, offline, updates, recovery, and the main quote flow.
 
 ## Privacy and data
 
@@ -73,10 +73,9 @@ Read the complete [privacy policy](public/privacy/index.html) and
 
 ## Deploy
 
-Publish `dist/` to the static host. `public/staticwebapp.config.json` rewrites
-the product's real application URLs, serves the designed 404 page for unknown
-paths, sets security headers, and keeps hashed assets immutable. The service
-worker requires HTTPS in production.
+Publish `dist/` to the static host. `public/staticwebapp.config.json` configures
+application routes and the 404 page. It also sets security and cache headers.
+The service worker requires HTTPS in production.
 
 ## Design and license
 

@@ -1,4 +1,14 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
+import { Buffer } from 'node:buffer';
+
+const CONSENT_TEXT = 'I confirm I reviewed this exact quote version and intend to record the decision shown.';
+
+async function downloadText(download: Download): Promise<string> {
+  const content = await download.createReadStream();
+  let exported = '';
+  for await (const chunk of content!) exported += chunk.toString();
+  return exported;
+}
 
 async function resetDemo(page: Page): Promise<void> {
   await page.goto('/demo');
@@ -24,6 +34,23 @@ async function addDemoQuote(page: Page, number: string): Promise<void> {
   await page.getByLabel('Scope and deliverables').fill(`Sample scope for ${number}.`);
   await page.getByRole('button', { name: 'Save quote' }).click();
   await expect(page.getByRole('heading', { name: `Project ${number}`, level: 1 })).toBeVisible();
+}
+
+async function createReviewedQuoteLink(page: Page, project: string): Promise<string> {
+  await resetDemo(page);
+  await page.getByRole('link', { name: 'Start for real' }).first().click();
+  await page.getByRole('link', { name: 'Create a quote' }).click();
+  await page.getByLabel('Client name').fill('North & Pine');
+  await page.getByLabel('Project').fill(project);
+  await page.getByLabel('Total amount').fill('4800');
+  await page.getByLabel('Scope and deliverables').fill('Design and build a five-page launch site.');
+  await page.getByRole('button', { name: 'Save quote' }).click();
+  await page.getByRole('button', { name: 'Review quote' }).click();
+  for (const checkbox of await page.getByRole('checkbox').all()) await checkbox.check();
+  await page.getByLabel('Reviewer name').fill('Mira Chen');
+  await page.getByRole('button', { name: 'Mark send-ready' }).click();
+  await page.getByRole('button', { name: 'Prepare client link' }).click();
+  return page.getByLabel('Client decision link').inputValue();
 }
 
 test('@claim:demo-sample-data opens an isolated sample log in one click', async ({ page }, testInfo) => {
@@ -100,7 +127,7 @@ test('@claim:client-link keeps the sample quote in a URL fragment', async ({ pag
   await resetDemo(page);
   await page.getByRole('link', { name: /Website launch/ }).click();
   await page.getByRole('button', { name: /prepare client link/i }).click();
-  const link = await page.getByLabel('Private decision link').inputValue();
+  const link = await page.getByLabel('Client decision link').inputValue();
   expect(new URL(link).hash).toMatch(/^#client\//);
   expect(new URL(link).hash).toContain('client/');
   await expect(page.getByText('This link carries the quote itself. Send it through your own email or message.')).toBeVisible();
@@ -120,13 +147,118 @@ test('@claim:decision-receipt exports the accepted sample decision receipt', asy
   expect(JSON.parse(receipt)).toMatchObject({ schema: 2, product: 'quote-decision-log', decision: 'accepted' });
 });
 
-test('@claim:unlimited-price shows the $19 one-time unlimited option after leaving the demo', async ({ page }, testInfo) => {
+test('@claim:decision-consent-record records the exact consent and typed client name', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The isolated client context runs once in Chromium.');
+  const link = await createReviewedQuoteLink(page, 'Consent record');
+  const clientContext = await browser.newContext({ acceptDownloads: true });
+  const clientPage = await clientContext.newPage();
+  try {
+    await clientPage.goto(link);
+    await clientPage.getByText('Accept this quote').click();
+    await clientPage.getByLabel('Your full name').fill('Ada Client');
+    await clientPage.getByText(CONSENT_TEXT).click();
+    const receiptDownload = clientPage.waitForEvent('download');
+    await clientPage.getByRole('button', { name: 'Record decision' }).click();
+    const receipt = JSON.parse(await downloadText(await receiptDownload));
+    expect(receipt.clientName).toBe('Ada Client');
+    expect(receipt.consentText).toBe(CONSENT_TEXT);
+    await expect(clientPage.getByRole('heading', { name: 'Accepted by Ada Client' })).toBeVisible();
+  } finally {
+    await clientContext.close();
+  }
+});
+
+test('@claim:backup-import restores a valid demo backup after reload', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
+  await resetDemo(page);
+  await page.goto('/demo/data');
+  const backupDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON' }).click();
+  const backup = await downloadText(await backupDownload);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete all quotes' }).click();
+  await expect(page.locator('#toast').getByText('All local quotes deleted.')).toBeVisible();
+  await page.locator('#backup-file').setInputFiles({ name: 'quote-decision-backup.json', mimeType: 'application/json', buffer: Buffer.from(backup) });
+  await expect(page.locator('#toast').getByText('2 quotes imported.')).toBeVisible();
+  await page.reload();
+  await page.getByRole('link', { name: 'Quote log' }).click();
+  await expect(page.getByText('Cedar & Kite')).toBeVisible();
+  await expect(page.getByText('Harrow & Vale')).toBeVisible();
+});
+
+test('@claim:delete-local-quotes clears real quotes without changing demo data', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
+  await resetDemo(page);
+  await page.getByRole('link', { name: 'Start for real' }).first().click();
+  await page.getByRole('link', { name: 'Create a quote' }).click();
+  await page.getByLabel('Client name').fill('Delete Me Studio');
+  await page.getByLabel('Project').fill('Temporary quote');
+  await page.getByLabel('Total amount').fill('1250');
+  await page.getByLabel('Scope and deliverables').fill('A quote created to verify local deletion.');
+  await page.getByRole('button', { name: 'Save quote' }).click();
+  await page.goto('/data');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete all quotes' }).click();
+  await page.reload();
+  expect(await page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const request = indexedDB.open('quote-decision-log', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const count = request.result.transaction('quotes').objectStore('quotes').count();
+      count.onerror = () => reject(count.error);
+      count.onsuccess = () => resolve(count.result);
+    };
+  }))).toBe(0);
+  await page.goto('/demo');
+  await expect(page.getByText('Cedar & Kite')).toBeVisible();
+  await expect(page.getByText('Harrow & Vale')).toBeVisible();
+});
+
+test('@claim:delete-client-receipt removes a saved client receipt after reload', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The isolated client context runs once in Chromium.');
+  const link = await createReviewedQuoteLink(page, 'Receipt deletion');
+  const clientContext = await browser.newContext({ acceptDownloads: true });
+  const clientPage = await clientContext.newPage();
+  try {
+    await clientPage.goto(link);
+    await clientPage.getByText('Accept this quote').click();
+    await clientPage.getByLabel('Your full name').fill('Ada Client');
+    await clientPage.getByText(CONSENT_TEXT).click();
+    const receiptDownload = clientPage.waitForEvent('download');
+    await clientPage.getByRole('button', { name: 'Record decision' }).click();
+    await receiptDownload;
+    clientPage.once('dialog', (dialog) => dialog.accept());
+    await clientPage.getByRole('button', { name: 'Delete local receipt' }).click();
+    await expect(clientPage.locator('#toast').getByText('Client receipt deleted from this device.')).toBeVisible();
+    await clientPage.reload();
+    await expect(clientPage.getByRole('heading', { name: 'Record a clear answer' })).toBeVisible();
+    expect(await clientPage.evaluate(async () => {
+      const names = (await indexedDB.databases()).map((database) => database.name);
+      if (!names.includes('quote-decision-client-receipts')) return 0;
+      return new Promise<number>((resolve, reject) => {
+        const request = indexedDB.open('quote-decision-client-receipts', 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const count = request.result.transaction('receipts').objectStore('receipts').count();
+          count.onerror = () => reject(count.error);
+          count.onsuccess = () => resolve(count.result);
+        };
+      });
+    })).toBe(0);
+  } finally {
+    await clientContext.close();
+  }
+});
+
+test('@claim:unlimited-price displays the $19 one-time unlimited option and product checkout handoff', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
   await resetDemo(page);
   await page.getByRole('link', { name: 'Start for real' }).first().click();
   await page.goto('/data');
-  await expect(page.getByRole('link', { name: 'Buy unlimited — $19' })).toBeVisible();
-  await expect(page.getByText(/one-time purchase unlocks unlimited quotes/i)).toBeVisible();
+  const checkout = page.getByRole('link', { name: 'Open $19 checkout' });
+  await expect(checkout).toBeVisible();
+  await expect(checkout).toHaveAttribute('href', 'https://pilot-api.sociobot.in/api/v1/products/quote-decision-log/checkout');
+  await expect(page.getByText(/displays a \$19 one-time option for unlimited quotes/i)).toBeVisible();
 });
 
 test('@claim:free-five-quotes applies the five-quote free allowance in the demo', async ({ page }, testInfo) => {
