@@ -1,11 +1,14 @@
-# Quote Decision polish 1 handoff
+# Quote Decision verification 6 handoff
 
 ## Result
 
-**PASS.** All 13 findings in `.factory/review-1.md` are resolved and v1.0.3 is
-live at <https://quote-decision-log.sociobot.in>.
+**FAIL.** Candidate `5d9bc5766cf5fa839a6a529fc8795c3e7b5fe8e0` is live at
+<https://quote-decision-log.sociobot.in>, but it does not meet the required
+mobile performance threshold. A clean Lighthouse audit recorded performance
+87/100 and CLS 0.10698; the required values are at least 90 and below 0.1.
+See [verification-6.md](verification-6.md) for the complete fresh evidence.
 
-## What changed
+## Prior implementation summary
 
 - Added exact claim coverage for decision consent, backup import, local quote
   deletion, and client-receipt deletion.
@@ -24,9 +27,10 @@ live at <https://quote-decision-log.sociobot.in>.
 The product keeps its art-deco dispatch-desk identity, palette, typography,
 stepped panels, route grammar, and original generated illustration.
 
-## Verification
+## Fresh verification
 
-Final clean clone: `/tmp/tmp.evbfZeXNHo/quote-decision-log`.
+Candidate checkout: `/work/repo` at
+`5d9bc5766cf5fa839a6a529fc8795c3e7b5fe8e0`.
 
 ```sh
 npm ci
@@ -37,28 +41,23 @@ npm run build
 npm run test:e2e
 ```
 
-Results:
+Fresh results:
 
 - unit/contract: 11 passed;
 - typecheck and lint: passed;
 - build: passed with `dist/index.html` at the root;
-- browser: 40 passed, 26 expected cross-project skips;
-- all 16 `.factory/claims.json` commands: passed separately from a clean clone;
-- all 16 claim commands against production: passed;
-- live accessibility/routing subset: 6 passed, 4 expected project skips;
-- live cold verifier: no console errors, one h1, `lang="en"`, main landmark,
-  no missing alt text, and no unlabeled buttons;
-- live routes: root, demo, data, privacy, and terms returned 200; unknown route
-  returned the designed HTTP 404;
-- production asset sizes: 16.70 kB JavaScript gzip, 6.05 kB CSS gzip;
-- Lighthouse: 100 performance, 100 accessibility, 100 best practices, 100 SEO;
-  LCP 1.7 s, CLS 0, TBT 0 ms.
+- browser suite status: passed with no failed tests;
+- all 16 `.factory/claims.json` commands completed separately before broader QA;
+- the live demo, normal quote flow, client receipt flow, offline reload,
+  desktop and 390px checks, request log, headers, accessibility scans, and
+  candidate deployment comparison passed;
+- production asset sizes: 16.70 kB JavaScript gzip and 6.05 kB CSS gzip;
+- Lighthouse mobile: 87 performance, 100 accessibility, 100 best practices,
+  100 SEO; LCP 1.131 s, CLS 0.10698, TBT 424 ms.
 
-Evidence is indexed in [polish-1.md](polish-1.md). Key files are the
-[live verifier report](evidence/polish-1/live/verify.json),
-[live mobile screenshot](evidence/polish-1/live/screenshot-mobile.png),
-[live share warning](evidence/polish-1/live/share-warning-mobile.png), and
-[Lighthouse report](evidence/polish-1/lighthouse.json).
+The full current report and exact commands are in
+[verification-6.md](verification-6.md). The fresh Lighthouse JSON is at
+`/tmp/quote-decision-lighthouse-2.json` in this verification container.
 
 ## Deployment and repository
 
@@ -69,6 +68,8 @@ Evidence is indexed in [polish-1.md](polish-1.md). Key files are the
 
 ## Known gaps and next steps
 
-None in the reviewed scope. The hosted billing page was intentionally not
-opened because it is outside the permitted resource scope; the app's exact
-product checkout handoff is covered without contacting it.
+Release is blocked on the mobile Lighthouse result. Reduce layout movement and
+main-thread blocking, then rerun clean mobile Lighthouse until it is at least
+90 with CLS below 0.1. The external hosted billing endpoint was not requested
+because this verification was limited to the scoped product resource; its
+documented rate allowance was therefore not independently measured.
