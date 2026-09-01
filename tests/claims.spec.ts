@@ -131,6 +131,7 @@ test('@claim:client-link keeps the sample quote in a URL fragment', async ({ pag
   expect(new URL(link).hash).toMatch(/^#client\//);
   expect(new URL(link).hash).toContain('client/');
   await expect(page.getByText('This link carries the quote itself. Send it through your own email or message.')).toBeVisible();
+  await expect(page.getByText('Anyone with this link can read the reviewed quote.')).toBeVisible();
   await expect(page.getByText(/No account or network request is needed/i)).toHaveCount(0);
 });
 

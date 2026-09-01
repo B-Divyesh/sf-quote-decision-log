@@ -295,6 +295,17 @@ test('uses real app URLs, route titles, shared headers, social metadata, and the
   await expect(page.getByRole('heading', { name: 'This page is not in the quote log.' })).toBeVisible();
 });
 
+test('updates the real URL and focuses each heading on forward and back navigation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'History and focus behavior is viewport-independent.');
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Create a quote' }).click();
+  await expect(page).toHaveURL(/\/new$/);
+  await expect(page.getByRole('heading', { name: 'Create a quote' })).toBeFocused();
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Review quotes before you send them.' })).toBeFocused();
+});
+
 test('does not throw when service worker registration is blocked', async ({ browser }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'The resilience check runs once in Chromium.');
   const context = await browser.newContext({ serviceWorkers: 'block' });
