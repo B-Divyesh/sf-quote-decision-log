@@ -30,7 +30,7 @@ exceeds 22 words, and no banned marketing term appears.
 | 7 | Try the shipped sample workspace at <https://quote-decision-log.sociobot.in/demo>. | Pass |
 | 11 | It starts with two realistic quotes in a separate demo database. | Pass |
 | 17 | Use Reset demo to restore them or Start for real to open your own empty quote log. | Pass |
-| 9 | keeps quote data in browser IndexedDB on the device; | Pass |
+| 10 | keeps quote data in this browser on this device; | Pass |
 | 9 | shows a named review before a quote is send-ready; | Pass |
 | 13 | puts the reviewed quote in a link you can send to the client; | Pass |
 | 5 | exports portable JSON decision receipts; | Pass |

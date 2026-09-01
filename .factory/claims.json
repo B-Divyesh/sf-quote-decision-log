@@ -63,6 +63,13 @@
     "sandbox": "fresh /demo, then Start for real; create a normal quote and use a separate clean client context to assert exact consent text and typed name in the downloaded receipt"
   },
   {
+    "id": "receipt-import",
+    "claim": "Imports a valid client consent receipt into its matching quote.",
+    "where": "landing How it works and sent quote screen",
+    "test": "npm run test:e2e -- --grep @claim:receipt-import",
+    "sandbox": "fresh /demo; send the Website launch sample, record a valid decision in a separate clean client context, import its receipt, then reject a missing-consent receipt while the imported decision remains visible"
+  },
+  {
     "id": "client-decision-retention",
     "claim": "A recorded client decision stays on that client's device.",
     "where": "client decision form and completion state",

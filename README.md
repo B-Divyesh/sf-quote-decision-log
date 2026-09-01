@@ -11,7 +11,7 @@ quotes in a separate demo database. Use **Reset demo** to restore them or
 
 ## What it does
 
-- keeps quote data in browser IndexedDB on the device;
+- keeps quote data in this browser on this device;
 - shows a named review before a quote is send-ready;
 - puts the reviewed quote in a link you can send to the client;
 - exports portable JSON decision receipts;

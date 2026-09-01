@@ -169,6 +169,40 @@ test('@claim:decision-consent-record records the exact consent and typed client 
   }
 });
 
+test('@claim:receipt-import imports a valid client receipt and preserves the quote when an invalid receipt is rejected', async ({ page, browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The isolated client context runs once in Chromium.');
+  await resetDemo(page);
+  await page.getByRole('link', { name: /Website launch/ }).click();
+  await page.getByRole('button', { name: 'Prepare client link' }).click();
+  const link = await page.getByLabel('Client decision link').inputValue();
+  await page.getByRole('button', { name: 'Mark as sent' }).click();
+
+  const clientContext = await browser.newContext({ acceptDownloads: true });
+  const clientPage = await clientContext.newPage();
+  let receiptText = '';
+  try {
+    await clientPage.goto(link);
+    await clientPage.getByText('Accept this quote').click();
+    await clientPage.getByLabel('Your full name').fill('Ari Patel');
+    await clientPage.getByText(CONSENT_TEXT).click();
+    const receiptDownload = clientPage.waitForEvent('download');
+    await clientPage.getByRole('button', { name: 'Record decision' }).click();
+    receiptText = await downloadText(await receiptDownload);
+  } finally {
+    await clientContext.close();
+  }
+
+  await page.locator('#receipt-file').setInputFiles({ name: 'valid-decision.json', mimeType: 'application/json', buffer: Buffer.from(receiptText) });
+  await expect(page.getByRole('heading', { name: 'Accepted by Ari Patel' })).toBeVisible();
+  await expect(page.locator('#toast')).toContainText('Client decision imported: accepted.');
+
+  const invalidReceipt = JSON.parse(receiptText) as Record<string, unknown>;
+  delete invalidReceipt.consentText;
+  await page.locator('#receipt-file').setInputFiles({ name: 'missing-consent.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(invalidReceipt)) });
+  await expect(page.locator('#toast')).toContainText('explicit-consent evidence');
+  await expect(page.getByRole('heading', { name: 'Accepted by Ari Patel' })).toBeVisible();
+});
+
 test('@claim:backup-import restores a valid demo backup after reload', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
   await resetDemo(page);
