@@ -1,0 +1,27 @@
+{
+  "url": "https://quote-decision-log.sociobot.in",
+  "resource": "sf-quote-decision-log",
+  "deploymentId": "be45a33a-11c2-4847-871f-7807fb43902a",
+  "implementationCommit": "fb31f97",
+  "publicFilesCompared": 20,
+  "sha256Mismatches": 0,
+  "verifyUrl": {
+    "loadMs": 778,
+    "consoleOrPageErrors": 0,
+    "title": "Demo — Quote Decision",
+    "lang": "en",
+    "h1Count": 1,
+    "hasMain": true,
+    "imagesMissingAlt": 0,
+    "buttonsUnlabeled": 0
+  },
+  "responsePolicy": {
+    "contentSecurityPolicy": true,
+    "permissionsPolicy": true,
+    "referrerPolicy": "no-referrer",
+    "xContentTypeOptions": "nosniff",
+    "strictTransportSecurity": true,
+    "hashedAssetsImmutable": true,
+    "manifestMime": "application/manifest+json"
+  }
+}
