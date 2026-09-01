@@ -337,7 +337,7 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
     await page.getByRole('button', { name: 'Update now' }).click();
     await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v5-regression'));
     await expect(page.getByRole('heading', { name: /Review quotes before you send them/i })).toBeVisible();
-    expect(await page.evaluate(async () => (await caches.keys()).some((key) => key === 'qd-shell-v5'))).toBe(false);
+    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v5'));
   } finally {
     await writeFile(swPath, original);
   }
