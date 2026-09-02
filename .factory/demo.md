@@ -16,9 +16,10 @@ IndexedDB database and client receipts in
 `quote-decision-log` and `quote-decision-client-receipts`; demo mode does not
 read or write them. The visible **Demo — sample data, nothing is saved**
 banner has **Reset demo** to restore the two samples and **Start for real** to
-leave the sandbox. Leaving the demo discards no real data; its separate demo
-data remains available only until the next reset or browser-site-data cleanup.
+leave the sandbox. **Start for real** clears both demo databases before it
+opens the normal quote log. It never reads, changes, or deletes real records.
 
 Every claim test starts from this seeded demo entry point. Tests for real-data
 deletion and client receipts then use **Start for real** and a separate clean
-client context. This proves demo actions cannot read or change real records.
+client context. The demo claim also creates a sample edit and receipt, leaves
+the demo, and proves both are gone while a pre-existing real quote remains.

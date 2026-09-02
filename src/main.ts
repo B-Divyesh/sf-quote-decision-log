@@ -107,8 +107,8 @@ function shell(content: string, section = 'home'): string {
       <div class="rail-foot"><span id="network-state" class="network-state"><i></i>${navigator.onLine ? 'Online' : 'Offline'}</span><span class="privacy-note">Stored on this device</span></div>
     </header>
     <div id="offline-banner" class="offline-banner" ${navigator.onLine ? 'hidden' : ''}>Offline — changes stay here on this device.</div>
-    <main id="main" tabindex="-1">${demoMode ? '<aside class="demo-banner" aria-label="Demo mode"><span><b>Demo</b> — sample data, nothing is saved.</span><button type="button" data-reset-demo>Reset demo</button><a href="/">Start for real</a></aside>' : ''}${content}</main>
-    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.4</span></footer>
+    <main id="main" tabindex="-1">${demoMode ? '<aside class="demo-banner" aria-label="Demo mode"><span><b>Demo</b> — sample data, nothing is saved.</span><button type="button" data-reset-demo>Reset demo</button><a href="/" data-start-real>Start for real</a></aside>' : ''}${content}</main>
+    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.5</span></footer>
     <div id="live" class="sr-only" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
   </div>`;
@@ -139,9 +139,11 @@ function dashboard(): void {
   if (storageError) { renderError('Local storage is unavailable', storageError); return; }
   if (!quotes.length) {
     app.innerHTML = shell(`<section class="hero">
-      <div class="hero-copy"><span class="eyebrow">Quote review and decision record</span><h1>Review quotes before you send them.</h1><p>For tiny agencies that need one checked quote and a clear client answer before work starts.</p><div class="hero-actions"><a class="button primary" href="/demo">Try it with sample data ${icon('arrow')}</a><span>See two sample quotes; no data is saved.</span><a class="text-action" href="${appPath('new')}">Create a quote</a></div><ul class="plain-facts"><li>Stored in this browser</li><li>Works offline after the first visit</li><li>$19 one-time unlimited option</li></ul></div>
+      <div class="hero-copy"><span class="eyebrow">Quote review and decision record</span><h1>Review quotes before you send them.</h1><p>For tiny agencies that need one checked quote and a clear client answer before work starts.</p><div class="hero-actions"><a class="button primary" href="/demo">Try it with sample data ${icon('arrow')}</a><span>See two sample quotes; no data is saved.</span><a class="text-action" href="${appPath('new')}">Create a quote</a></div><ul class="plain-facts"><li>Stored in this browser</li><li>Works offline after the first visit</li><li>Five quotes free · $19 once for unlimited</li></ul></div>
       <figure><picture><source media="(max-width: 700px)" srcset="${hero640}"><img src="${hero960}" width="960" height="640" alt="Geometric rail lines passing through a brass checkpoint toward a ticket" fetchpriority="high" decoding="async"></picture><figcaption>Review before sending.</figcaption></figure>
-    </section><section class="how"><span class="station-code">HOW IT WORKS</span><h2>Review, send, then record the answer.</h2><ol><li><b>01</b><span><strong>Draft</strong>Capture scope, value, and expiry.</span></li><li><b>02</b><span><strong>Review</strong>A named teammate checks the exact version.</span></li><li><b>03</b><span><strong>Send</strong>Share a link that carries the reviewed quote.</span></li><li><b>04</b><span><strong>Record</strong>Import the client’s consent receipt.</span></li></ol></section>`);
+    </section><section class="how"><span class="station-code">HOW IT WORKS</span><h2>Review, send, then record the answer.</h2><ol><li><b>01</b><span><strong>Draft</strong>Capture scope, value, and expiry.</span></li><li><b>02</b><span><strong>Review</strong>A named teammate checks the exact version.</span></li><li><b>03</b><span><strong>Send</strong>Share a link that carries the reviewed quote.</span></li><li><b>04</b><span><strong>Record</strong>Import the client’s consent receipt.</span></li></ol></section>
+    <div class="landing-info"><section class="landing-section privacy-limits"><span class="station-code">LOCAL CONTROL</span><h2>Privacy and limits</h2><ul><li>Quote records stay in this browser on this device.</li><li>Anyone with a client link can read the quote.</li><li>This is not a payment, document-editing, or regulated electronic-signature service.</li></ul><div class="landing-links"><a href="/privacy/">Read Privacy</a><a href="/terms/">Read Terms</a></div></section>
+    <section class="landing-section price-section"><span class="station-code">ONE-TIME LICENSE</span><h2>Price</h2><p>Use five quotes free. Pay $19 once to remove the quote limit.</p><a class="button primary" href="${checkoutUrl}">Open $19 checkout</a></section></div>`);
     bindShared();
     return;
   }
@@ -425,8 +427,8 @@ async function deleteQuote(quote: Quote): Promise<void> {
 function dataPage(): void {
   const unlocked = hasUnlimitedQuotes();
   const accessPanel = demoMode
-    ? `<section class="settings-panel license-panel"><span class="station-code">DEMO STORAGE</span><h2>Sample data only</h2><p>These two sample quotes use the separate demo database. Reset the demo to restore them, or start for real to use your own empty quote log.</p><div class="button-row"><button class="button secondary" type="button" data-reset-demo>Reset demo</button><a class="button primary" href="/">Start for real</a></div></section>`
-    : `<section class="settings-panel license-panel"><span class="station-code">ONE-TIME LICENSE</span><h2>${unlocked ? 'Unlimited is active' : 'Keep every quote moving'}</h2><p>${unlocked ? 'This device has a valid cached license. Thank you for supporting this focused tool.' : `The free edition handles ${FREE_LIMIT} active quotes. The app displays a $19 one-time option for unlimited quotes and future v1 updates.`}</p>${unlocked ? `<button class="button secondary" data-verify-license>Verify license now</button><button class="link-button danger-link" data-remove-license>Remove from this device</button>` : `<a class="button primary" href="${checkoutUrl}">Open $19 checkout</a><form id="license-form"><label>Have a license? Paste it here<input name="license" autocomplete="off" required></label><button class="button secondary" type="submit">Restore purchase</button></form>`}<p class="fine-print">Checkout is hosted by Sociobot. Dodo is the merchant of record. Refunds are handled there and revoke the license. <a href="/terms/">Terms</a> apply.</p><div id="license-status" role="status"></div></section>`;
+    ? `<section class="settings-panel license-panel"><span class="station-code">DEMO STORAGE</span><h2>Sample data only</h2><p>These two sample quotes use the separate demo database. Reset the demo to restore them, or start for real to use your own empty quote log.</p><div class="button-row"><button class="button secondary" type="button" data-reset-demo>Reset demo</button><a class="button primary" href="/" data-start-real>Start for real</a></div></section>`
+    : `<section class="settings-panel license-panel"><span class="station-code">ONE-TIME LICENSE</span><h2>${unlocked ? 'Unlimited is active' : 'Keep every quote moving'}</h2><p>${unlocked ? 'This device has a valid cached license. Thank you for supporting this focused tool.' : `The free edition stores up to ${FREE_LIMIT} quotes. The app displays a $19 one-time option for unlimited quotes.`}</p>${unlocked ? `<button class="button secondary" data-verify-license>Verify license now</button><button class="link-button danger-link" data-remove-license>Remove from this device</button>` : `<a class="button primary" href="${checkoutUrl}">Open $19 checkout</a><form id="license-form"><label>Have a license? Paste it here<input name="license" autocomplete="off" required></label><button class="button secondary" type="submit">Restore purchase</button></form>`}<p class="fine-print">Checkout is hosted by Sociobot. Dodo is the merchant of record. Refunds are handled there and revoke the license. <a href="/terms/">Terms</a> apply.</p><div id="license-status" role="status"></div></section>`;
   app.innerHTML = shell(`<header class="page-head"><div><span class="eyebrow">Ownership & access</span><h1>Data and license</h1><p>Back up the whole log, move decisions between devices, or remove everything.</p></div></header>
     <div class="settings-grid"><section class="settings-panel"><span class="station-code">YOUR DATA</span><h2>Portable by design</h2><p>${demoMode ? 'Sample quotes live in the demo browser database. Export a JSON backup or CSV overview to inspect the same controls.' : 'Quotes live in this browser’s IndexedDB. Export a JSON backup for restoration or a CSV overview for your records.'}</p>${storageError ? `<div class="notice" role="alert"><b>Local data needs recovery.</b><p>${escapeHtml(storageError)} Import a valid backup to replace it, or delete the invalid local data below.</p></div>` : ''}<div class="button-row"><button class="button primary" data-export-json ${storageError ? 'disabled' : ''}>${icon('download')} Export JSON</button><button class="button secondary" data-export-csv ${storageError ? 'disabled' : ''}>Export CSV</button><button class="button secondary" data-import-backup>Import backup</button></div><input id="backup-file" type="file" accept="application/json,.json" hidden><hr><h3>Delete local data</h3><p>${storageError ? 'Removes the unreadable local quote data from this device.' : `Removes all ${quotes.length} quote${quotes.length === 1 ? '' : 's'} from this device. Export first if you might need them.`}</p><button class="button danger" data-delete-all>${storageError ? 'Delete invalid local data' : 'Delete all quotes'}</button></section>${accessPanel}</div>`, 'data');
   document.querySelector('[data-export-json]')?.addEventListener('click', exportJson);
@@ -486,7 +488,7 @@ async function checkLicense(force = false): Promise<void> {
 
 function paywall(): void {
   if (demoMode) {
-    app.innerHTML = shell(`<section class="empty compact"><span class="station-code">DEMO LIMIT · ${FREE_LIMIT}/${FREE_LIMIT}</span><h1>The sample log is full</h1><p>Reset the demo to restore the two sample quotes, or start for real to create your own quote log.</p><div class="button-row centered"><button class="button primary" type="button" data-reset-demo>Reset demo</button><a class="button secondary" href="/">Start for real</a></div></section>`, 'new');
+    app.innerHTML = shell(`<section class="empty compact"><span class="station-code">DEMO LIMIT · ${FREE_LIMIT}/${FREE_LIMIT}</span><h1>The sample log is full</h1><p>Reset the demo to restore the two sample quotes, or start for real to create your own quote log.</p><div class="button-row centered"><button class="button primary" type="button" data-reset-demo>Reset demo</button><a class="button secondary" href="/" data-start-real>Start for real</a></div></section>`, 'new');
     bindShared();
     return;
   }
@@ -503,6 +505,9 @@ function bindShared(): void {
   updateNetworkState();
   document.querySelectorAll<HTMLButtonElement>('[data-reset-demo]').forEach((button) => {
     button.addEventListener('click', () => void resetDemo());
+  });
+  document.querySelectorAll<HTMLAnchorElement>('[data-start-real]').forEach((link) => {
+    link.addEventListener('click', (event) => void leaveDemo(event, link));
   });
 }
 
@@ -563,6 +568,21 @@ async function resetDemo(): Promise<void> {
   await seedDemoData();
   navigate('home');
   setToast('Demo reset with two sample quotes.');
+}
+
+async function leaveDemo(event: Event, link: HTMLAnchorElement): Promise<void> {
+  event.preventDefault();
+  if (!demoMode || link.getAttribute('aria-busy') === 'true') return;
+  link.setAttribute('aria-busy', 'true');
+  link.textContent = 'Clearing demo…';
+  try {
+    await Promise.all([quoteStore.clear(), clientReceiptStore.clear()]);
+    location.assign('/');
+  } catch {
+    link.removeAttribute('aria-busy');
+    link.textContent = 'Start for real';
+    setToast('The demo could not be cleared. Check browser storage permissions and try again.');
+  }
 }
 
 function route(moveFocus = false): void {

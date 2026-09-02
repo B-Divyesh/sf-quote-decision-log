@@ -1,10 +1,17 @@
 [
   {
     "id": "demo-sample-data",
-    "claim": "Try it with sample data opens two isolated sample quotes.",
+    "claim": "Try it with sample data opens two isolated sample quotes, and Start for real discards demo changes.",
     "where": "landing action and demo banner",
     "test": "npm run test:e2e -- --grep @claim:demo-sample-data",
-    "sandbox": "fresh browser; click the landing action; assert /demo, banner, samples, and demo IndexedDB namespace"
+    "sandbox": "fresh browser; click the landing action; add a demo quote and receipt; Start for real; assert both demo stores are empty, a real quote is unchanged, and re-entry restores only two seeds"
+  },
+  {
+    "id": "quote-fields",
+    "claim": "A quote saves its scope, value, and expiry.",
+    "where": "landing How it works and quote form",
+    "test": "npm run test:e2e -- --grep @claim:quote-fields",
+    "sandbox": "fresh /demo; create a quote with exact scope, amount, and expiry; reload its route; assert all three displayed and stored values"
   },
   {
     "id": "local-device-privacy",

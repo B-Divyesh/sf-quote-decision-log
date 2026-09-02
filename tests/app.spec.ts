@@ -174,6 +174,28 @@ test('has no serious accessibility findings on the empty state', async ({ page }
   await expect(page.locator('main')).toHaveCount(1);
 });
 
+test('explains privacy, limits, and the complete price tier on the landing page', async ({ page }, testInfo) => {
+  await expect(page.getByRole('heading', { name: 'Privacy and limits' })).toBeVisible();
+  await expect(page.getByText('Quote records stay in this browser on this device.')).toBeVisible();
+  await expect(page.getByText('Anyone with a client link can read the quote.')).toBeVisible();
+  await expect(page.getByText('This is not a payment, document-editing, or regulated electronic-signature service.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Price' })).toBeVisible();
+  await expect(page.getByText('Use five quotes free. Pay $19 once to remove the quote limit.')).toBeVisible();
+  const billingOrigin = new URL(page.url()).hostname === 'quote-decision-log.sociobot.in'
+    ? 'https://api.sociobot.in'
+    : 'https://pilot-api.sociobot.in';
+  await expect(page.getByRole('link', { name: 'Open $19 checkout' })).toHaveAttribute('href', `${billingOrigin}/api/v1/products/quote-decision-log/checkout`);
+  if (testInfo.project.name === 'mobile') {
+    const pageWidth = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+    expect(pageWidth.scroll).toBeLessThanOrEqual(pageWidth.client);
+    for (const link of await page.locator('.landing-info a').all()) {
+      const box = await link.boundingBox();
+      expect(box?.height, await link.innerText()).toBeGreaterThanOrEqual(44);
+      expect(box?.width, await link.innerText()).toBeGreaterThanOrEqual(44);
+    }
+  }
+});
+
 test('has no serious accessibility findings on form, data, and legal screens', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'The mobile client screen is scanned in the lifecycle test.');
   for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/']) {
@@ -342,13 +364,13 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   const original = await readFile(swPath, 'utf8');
   try {
     await ensureServiceWorkerControl(page);
-    await writeFile(swPath, original.replaceAll('qd-shell-v6', 'qd-shell-v6-regression').replaceAll('qd-assets-v6', 'qd-assets-v6-regression'));
+    await writeFile(swPath, original.replaceAll('qd-shell-v7', 'qd-shell-v7-regression').replaceAll('qd-assets-v7', 'qd-assets-v7-regression'));
     await page.evaluate(async () => { await navigator.serviceWorker.register(`/sw.js?update-test=${Date.now()}`); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
-    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v6-regression'));
+    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v7-regression'));
     await expect(page.getByRole('heading', { name: /Review quotes before you send them/i })).toBeVisible();
-    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v6'));
+    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v7'));
   } finally {
     await writeFile(swPath, original);
   }

@@ -63,9 +63,97 @@ test('@claim:demo-sample-data opens an isolated sample log in one click', async 
   await expect(page.getByText('Harrow & Vale')).toBeVisible();
   const names = await page.evaluate(async () => (await indexedDB.databases()).map((database) => database.name));
   expect(names).toContain('demo:quote-decision-log');
+  await page.getByRole('link', { name: 'Start for real' }).first().click();
+
+  await page.getByRole('link', { name: 'Create a quote' }).click();
+  await page.getByLabel('Client name').fill('Real Record Studio');
+  await page.getByLabel('Project').fill('Real quote survives');
+  await page.getByLabel('Total amount').fill('725');
+  await page.getByLabel('Scope and deliverables').fill('Keep this real quote outside the sample workspace.');
+  await page.getByRole('button', { name: 'Save quote' }).click();
+  await expect(page.getByRole('heading', { name: 'Real quote survives', level: 1 })).toBeVisible();
+
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Try demo' }).click();
+  await expect(page).toHaveURL(/\/demo$/);
+  await page.getByRole('button', { name: 'Reset demo' }).click();
+  await addDemoQuote(page, 'QD-DISCARD');
+  await page.goto('/demo');
+  await page.getByRole('link', { name: /Website launch/ }).click();
+  await page.getByRole('button', { name: 'Prepare client link' }).click();
+  const demoClientLink = await page.getByLabel('Client decision link').inputValue();
+  await page.goto(demoClientLink);
+  await page.getByText('Accept this quote').click();
+  await page.getByLabel('Your full name').fill('Demo Client');
+  await page.getByText(CONSENT_TEXT).click();
+  const receiptDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Record decision' }).click();
+  await receiptDownload;
+
+  await page.goto('/demo');
+  await expect(page.getByText('Client QD-DISCARD')).toBeVisible();
+  await page.getByRole('link', { name: 'Start for real' }).first().click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByText('Real Record Studio')).toBeVisible();
+  expect(await page.evaluate(async () => {
+    const count = (name: string, storeName: string) => new Promise<number>((resolve, reject) => {
+      const request = indexedDB.open(name, 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const database = request.result;
+        const result = database.transaction(storeName).objectStore(storeName).count();
+        result.onerror = () => reject(result.error);
+        result.onsuccess = () => { database.close(); resolve(result.result); };
+      };
+    });
+    return Promise.all([
+      count('demo:quote-decision-log', 'quotes'),
+      count('demo:quote-decision-client-receipts', 'receipts'),
+    ]);
+  })).toEqual([0, 0]);
+
+  await page.goto('/demo');
+  await expect(page.getByText('Cedar & Kite')).toBeVisible();
+  await expect(page.getByText('Harrow & Vale')).toBeVisible();
+  await expect(page.getByText('Client QD-DISCARD')).toHaveCount(0);
   await page.goto('/?demo=1');
   await expect(page.getByLabel('Demo mode')).toContainText('sample data, nothing is saved');
   await expect(page.getByText('Cedar & Kite')).toBeVisible();
+});
+
+test('@claim:quote-fields restores the saved scope, value, and expiry after reload', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
+  await resetDemo(page);
+  await page.goto('/demo/new');
+  await page.getByLabel('Quote number').fill('QD-FIELDS-01');
+  await page.getByLabel('Client name').fill('Fieldproof Studio');
+  await page.getByLabel('Project').fill('Campaign asset package');
+  await page.getByLabel('Expiry date').fill('2027-04-18');
+  await page.getByLabel('Total amount').fill('12345.67');
+  await page.getByLabel('Scope and deliverables').fill('Create twelve edited product scenes for the launch campaign.');
+  await page.getByRole('button', { name: 'Save quote' }).click();
+  await expect(page.getByRole('heading', { name: 'Campaign asset package', level: 1 })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Campaign asset package', level: 1 })).toBeVisible();
+  await expect(page.locator('.scope')).toContainText('Create twelve edited product scenes for the launch campaign.');
+  await expect(page.locator('.total')).toHaveText('$12,345.67');
+  await expect(page.locator('.paper-meta')).toContainText('Apr 18, 2027');
+  expect(await page.evaluate(() => new Promise<Record<string, unknown>>((resolve, reject) => {
+    const request = indexedDB.open('demo:quote-decision-log', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const get = request.result.transaction('quotes').objectStore('quotes').getAll();
+      get.onerror = () => reject(get.error);
+      get.onsuccess = () => {
+        const quote = (get.result as Array<{ versions: Array<{ snapshot: Record<string, unknown> }> }>).find((item) => item.versions[0]?.snapshot.number === 'QD-FIELDS-01');
+        resolve(quote?.versions[0]?.snapshot ?? {});
+      };
+    };
+  }))).toMatchObject({
+    scope: 'Create twelve edited product scenes for the launch campaign.',
+    totalCents: 1234567,
+    expiresOn: '2027-04-18',
+  });
 });
 
 test('@claim:local-device-privacy keeps the demo flow on this origin', async ({ page }, testInfo) => {
@@ -287,13 +375,17 @@ test('@claim:delete-client-receipt removes a saved client receipt after reload',
 
 test('@claim:unlimited-price displays the $19 one-time unlimited option and product checkout handoff', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
-  await resetDemo(page);
-  await page.getByRole('link', { name: 'Start for real' }).first().click();
-  await page.goto('/data');
-  const checkout = page.getByRole('link', { name: 'Open $19 checkout' });
+  await page.goto('/');
   const billingOrigin = new URL(page.url()).hostname === 'quote-decision-log.sociobot.in'
     ? 'https://api.sociobot.in'
     : 'https://pilot-api.sociobot.in';
+  await expect(page.getByText('Pay $19 once to remove the quote limit.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open $19 checkout' })).toHaveAttribute('href', `${billingOrigin}/api/v1/products/quote-decision-log/checkout`);
+  await resetDemo(page);
+  await page.getByRole('link', { name: 'Start for real' }).first().click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.goto('/data');
+  const checkout = page.getByRole('link', { name: 'Open $19 checkout' });
   await expect(checkout).toBeVisible();
   await expect(checkout).toHaveAttribute('href', `${billingOrigin}/api/v1/products/quote-decision-log/checkout`);
   await expect(page.getByText(/displays a \$19 one-time option for unlimited quotes/i)).toBeVisible();
@@ -301,6 +393,8 @@ test('@claim:unlimited-price displays the $19 one-time unlimited option and prod
 
 test('@claim:free-five-quotes applies the five-quote free allowance in the demo', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
+  await page.goto('/');
+  await expect(page.getByText('Use five quotes free.')).toBeVisible();
   await resetDemo(page);
   await addDemoQuote(page, 'QD-DEMO-01');
   await addDemoQuote(page, 'QD-DEMO-02');

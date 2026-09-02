@@ -13,12 +13,17 @@ exceeds 22 words, and no banned marketing term appears.
 | 8 | See two sample quotes; no data is saved. | Pass |
 | 4 | Stored in this browser | Pass |
 | 6 | Works offline after the first visit | Pass |
-| 4 | $19 one-time unlimited option | Pass |
+| 7 | Five quotes free · $19 once for unlimited | Pass |
 | 3 | Review before sending. | Pass |
 | 5 | Capture scope, value, and expiry. | Pass |
 | 7 | A named teammate checks the exact version. | Pass |
 | 8 | Share a link that carries the reviewed quote. | Pass |
 | 5 | Import the client’s consent receipt. | Pass |
+| 9 | Quote records stay in this browser on this device. | Pass |
+| 9 | Anyone with a client link can read the quote. | Pass |
+| 10 | This is not a payment, document-editing, or regulated electronic-signature service. | Pass |
+| 4 | Use five quotes free. | Pass |
+| 8 | Pay $19 once to remove the quote limit. | Pass |
 | 8 | Quote review and client decisions for tiny agencies. | Pass |
 
 ## README
@@ -29,7 +34,7 @@ exceeds 22 words, and no banned marketing term appears.
 | 15 | It keeps quote records in this browser and can work offline after the first visit. | Pass |
 | 7 | Try the shipped sample workspace at <https://quote-decision-log.sociobot.in/demo>. | Pass |
 | 11 | It starts with two realistic quotes in a separate demo database. | Pass |
-| 17 | Use Reset demo to restore them or Start for real to open your own empty quote log. | Pass |
+| 20 | Use Reset demo to restore them or Start for real to discard demo changes and open your own quote log. | Pass |
 | 10 | keeps quote data in this browser on this device; | Pass |
 | 9 | shows a named review before a quote is send-ready; | Pass |
 | 13 | puts the reviewed quote in a link you can send to the client; | Pass |
@@ -44,7 +49,7 @@ exceeds 22 words, and no banned marketing term appears.
 | 13 | Every visitor-facing product claim is listed with its exact browser test in `.factory/claims.json`. | Pass |
 | 7 | The sample sandbox is described in `.factory/demo.md`. | Pass |
 | 5 | Requires Node.js 20 or later. | Pass |
-| 7 | Data is specific to the browser origin. | Pass |
+| 8 | Each site address keeps its own browser data. | Pass |
 | 7 | The normal quote log uses `quote-decision-log` IndexedDB. | Pass |
 | 13 | The demo uses `demo:quote-decision-log` and does not read or write the normal database. | Pass |
 | 12 | Client receipts use the separate `quote-decision-client-receipts` database, with a separate demo namespace. | Pass |

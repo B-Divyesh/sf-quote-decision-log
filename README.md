@@ -7,7 +7,7 @@ work offline after the first visit.
 Try the shipped sample workspace at
 <https://quote-decision-log.sociobot.in/demo>. It starts with two realistic
 quotes in a separate demo database. Use **Reset demo** to restore them or
-**Start for real** to open your own empty quote log.
+**Start for real** to discard demo changes and open your own quote log.
 
 ## What it does
 
@@ -38,7 +38,7 @@ npm ci
 npm run dev
 ```
 
-Data is specific to the browser origin. The normal quote log uses
+Each site address keeps its own browser data. The normal quote log uses
 `quote-decision-log` IndexedDB. The demo uses `demo:quote-decision-log` and
 does not read or write the normal database. Client receipts use the separate
 `quote-decision-client-receipts` database, with a separate demo namespace.
