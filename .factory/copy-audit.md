@@ -1,4 +1,4 @@
-# Copy audit — 2026-09-01
+# Copy audit — 2026-09-02
 
 Whitespace-delimited counts include visible prose and facts. Headings, button
 labels, commands, and URLs are excluded unless they form a sentence. No item
@@ -73,6 +73,14 @@ exceeds 22 words, and no banned marketing term appears.
 | 6 | Source art is retained in `assets/src/`. | Pass |
 | 1 | MIT. | Pass |
 | 2 | See LICENSE. | Pass |
+
+## Offline fallback
+
+| Words | Copy | Result |
+| ---: | --- | --- |
+| 6 | This page is not available offline. | Pass |
+| 13 | Reconnect and try again, or open a quote page you visited while connected. | Pass |
+| 8 | Quote review and client decisions for tiny agencies. | Pass |
 
 ## Terminology
 

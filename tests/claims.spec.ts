@@ -166,6 +166,66 @@ test('@claim:local-device-privacy keeps the demo flow on this origin', async ({ 
   expect(requests.every((url) => new URL(url).origin === new URL(page.url()).origin)).toBe(true);
 });
 
+test('@claim:no-tracking-remote-resources runs the complete demo flow without tracking or remote resources', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
+  const requests: Array<{ method: string; resourceType: string; url: string }> = [];
+  await page.addInitScript(() => {
+    const calls: string[] = [];
+    const original = navigator.sendBeacon.bind(navigator);
+    Object.defineProperty(window, '__quoteDecisionBeaconCalls', { value: calls });
+    navigator.sendBeacon = (url, data) => {
+      calls.push(String(url));
+      return original(url, data);
+    };
+  });
+  page.on('request', (request) => requests.push({
+    method: request.method(),
+    resourceType: request.resourceType(),
+    url: request.url(),
+  }));
+
+  await page.goto('/');
+  await page.getByRole('link', { name: /try it with sample data/i }).click();
+  await page.getByRole('button', { name: 'Reset demo' }).click();
+  await page.getByRole('link', { name: /Website launch/ }).click();
+  await page.getByRole('button', { name: 'Prepare client link' }).click();
+  const link = await page.getByLabel('Client decision link').inputValue();
+  await page.getByRole('button', { name: 'Mark as sent' }).click();
+  await expect(page.getByRole('heading', { name: 'Marked as sent' })).toBeVisible();
+  await page.goto(link);
+  await page.getByText('Accept this quote').click();
+  await page.getByLabel('Your full name').fill('Demo Client');
+  await page.getByText(CONSENT_TEXT).click();
+  const receiptDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Record decision' }).click();
+  await receiptDownload;
+  await page.goto('/demo/data');
+  const backupDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON' }).click();
+  await backupDownload;
+
+  const appOrigin = new URL(page.url()).origin;
+  const allowedPaths = [
+    /^\/$/,
+    /^\/demo(?:\/data)?\/?$/,
+    /^\/assets\/index-[A-Za-z0-9_-]+\.(?:js|css)$/,
+    /^\/assets\/dispatch-gate-(?:640|960)(?:-[A-Za-z0-9_-]+)?\.webp$/,
+    /^\/(?:manifest\.webmanifest|sw\.js)$/,
+    /^\/icons\/icon(?:-192|-512|-maskable-512)?\.(?:svg|png)$/,
+  ];
+  expect(requests.length).toBeGreaterThan(0);
+  for (const request of requests) {
+    const url = new URL(request.url);
+    expect(url.origin, request.url).toBe(appOrigin);
+    expect(request.method, request.url).toBe('GET');
+    expect(request.resourceType, request.url).not.toBe('font');
+    expect(allowedPaths.some((pattern) => pattern.test(url.pathname)), request.url).toBe(true);
+    expect(url.pathname, request.url).not.toMatch(/(?:analytics|advert|beacon|collect|pixel|telemetry|track)/i);
+  }
+  expect(requests.filter((request) => ['fetch', 'xhr', 'eventsource', 'websocket', 'ping'].includes(request.resourceType))).toEqual([]);
+  expect(await page.evaluate(() => (window as unknown as { __quoteDecisionBeaconCalls: string[] }).__quoteDecisionBeaconCalls)).toEqual([]);
+});
+
 test('@claim:json-export exports the demo log as JSON', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'One desktop sandbox assertion is sufficient for this claim.');
   await resetDemo(page);

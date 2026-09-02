@@ -22,6 +22,12 @@ async function ensureServiceWorkerControl(page: Page): Promise<void> {
   await page.waitForFunction(() => navigator.serviceWorker?.controller != null);
 }
 
+function billingOriginFor(page: Page): string {
+  return new URL(page.url()).hostname === 'quote-decision-log.sociobot.in'
+    ? 'https://api.sociobot.in'
+    : 'https://pilot-api.sociobot.in';
+}
+
 test('creates, reviews, sends, and records a client decision', async ({ page, context }, testInfo) => {
   const pageErrors: string[] = [];
   const requestUrls: string[] = [];
@@ -198,7 +204,7 @@ test('explains privacy, limits, and the complete price tier on the landing page'
 
 test('has no serious accessibility findings on form, data, and legal screens', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'The mobile client screen is scanned in the lifecycle test.');
-  for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/', '/404.html']) {
+  for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/', '/offline.html', '/404.html']) {
     await page.goto(path);
     const results = await new AxeBuilder({ page: page as never }).analyze();
     expect(results.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')), path).toEqual([]);
@@ -257,7 +263,7 @@ test('keeps data and legal links at the 44px mobile target baseline', async ({ p
   const termsBox = await terms.boundingBox();
   expect(termsBox?.height).toBeGreaterThanOrEqual(44);
   expect(termsBox?.width).toBeGreaterThanOrEqual(44);
-  for (const path of ['/privacy/', '/terms/']) {
+  for (const path of ['/privacy/', '/terms/', '/offline.html']) {
     await page.goto(path);
     for (const link of await page.locator('main a, header a, footer a').all()) {
       const box = await link.boundingBox();
@@ -269,9 +275,14 @@ test('keeps data and legal links at the 44px mobile target baseline', async ({ p
 
 test('rerenders paid state immediately after an invalid license verification', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'License state is viewport-independent.');
-  await page.route('https://pilot-api.sociobot.in/api/v1/products/quote-decision-log/verify**', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify({ valid: false, reason: 'revoked' }),
-  }));
+  const billingOrigin = billingOriginFor(page);
+  let verificationRequests = 0;
+  await page.route(`${billingOrigin}/api/v1/products/quote-decision-log/verify**`, (route) => {
+    verificationRequests++;
+    return route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ valid: false, reason: 'revoked' }),
+    });
+  });
   await page.goto('/data');
   await page.evaluate(() => {
     localStorage.setItem('sb_license:quote-decision-log', 'invalid-license-token');
@@ -280,6 +291,7 @@ test('rerenders paid state immediately after an invalid license verification', a
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Unlimited is active' })).toBeVisible();
   await page.getByRole('button', { name: 'Verify license now' }).click();
+  await expect.poll(() => verificationRequests).toBe(1);
   await expect(page.getByRole('heading', { name: 'Keep every quote moving' })).toBeVisible();
   await expect(page.locator('#license-status')).toContainText('License no longer active');
   await expect(page.getByRole('link', { name: /open \$19 checkout/i })).toBeVisible();
@@ -297,6 +309,7 @@ test('uses real app URLs, route titles, shared headers, social metadata, and the
     { path: '/new', title: 'New quote — Quote Decision' },
     { path: '/privacy/', title: 'Privacy — Quote Decision' },
     { path: '/terms/', title: 'Terms — Quote Decision' },
+    { path: '/offline.html', title: 'Offline — Quote Decision' },
     { path: '/404.html', title: 'Page not found — Quote Decision' },
   ];
   for (const route of routes) {
@@ -364,28 +377,60 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   const original = await readFile(swPath, 'utf8');
   try {
     await ensureServiceWorkerControl(page);
-    await writeFile(swPath, original.replaceAll('qd-shell-v7', 'qd-shell-v7-regression').replaceAll('qd-assets-v7', 'qd-assets-v7-regression'));
+    await writeFile(swPath, original.replaceAll('qd-shell-v8', 'qd-shell-v8-regression').replaceAll('qd-assets-v8', 'qd-assets-v8-regression'));
     await page.evaluate(async () => { await navigator.serviceWorker.register(`/sw.js?update-test=${Date.now()}`); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
-    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v7-regression'));
+    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v8-regression'));
     await expect(page.getByRole('heading', { name: /Review quotes before you send them/i })).toBeVisible();
-    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v7'));
+    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v8'));
   } finally {
     await writeFile(swPath, original);
   }
 });
 
 test('stores a returned one-time license and verifies the unlock', async ({ page }) => {
-  await page.route('https://pilot-api.sociobot.in/api/v1/products/quote-decision-log/verify**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null }),
-  }));
+  const billingOrigin = billingOriginFor(page);
+  let verificationRequests = 0;
+  await page.route(`${billingOrigin}/api/v1/products/quote-decision-log/verify**`, (route) => {
+    verificationRequests++;
+    expect(new URL(route.request().url()).searchParams.get('license')).toBe('test-license-token');
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ valid: true, reason: 'ok', expires_at: null }),
+    });
+  });
   await page.goto('/data?license=test-license-token');
+  await expect.poll(() => verificationRequests).toBe(1);
+  await expect.poll(async () => page.evaluate(() => {
+    const verdict = JSON.parse(localStorage.getItem('sb_license:quote-decision-log:verdict') ?? '{}') as { valid?: boolean; checkedAt?: number };
+    return verdict.valid === true && Number(verdict.checkedAt) > 0;
+  })).toBe(true);
   await expect(page.getByRole('heading', { name: 'Unlimited is active' })).toBeVisible();
   expect(new URL(page.url()).searchParams.has('license')).toBe(false);
   expect(await page.evaluate(() => localStorage.getItem('sb_license:quote-decision-log'))).toBe('test-license-token');
+});
+
+test('uses literal copy and shared site chrome on the cached offline fallback', async ({ page, context }) => {
+  await ensureServiceWorkerControl(page);
+  await page.waitForFunction(async () => Boolean(await caches.match('/offline.html')) && Boolean(await caches.match('/legal.css')));
+  await context.setOffline(true);
+  try {
+    await page.goto('/offline.html');
+    await expect(page).toHaveTitle('Offline — Quote Decision');
+    await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: 'This page is not available offline.' })).toBeVisible();
+    await expect(page.locator('main')).toContainText('Reconnect and try again');
+    await expect(page.locator('body')).not.toContainText(/offline signal|app shell|between stations/i);
+    await expect(page.getByRole('link', { name: 'Quote Decision home' })).toHaveAttribute('href', '/');
+    for (const name of ['Quote log', 'Data & license', 'Try demo', 'Privacy']) {
+      await expect(page.locator('header').getByRole('link', { name })).toBeVisible();
+    }
+    await expect(page.locator('footer')).toContainText('Built by Param Factory');
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test('rejects whitespace-only required quote fields with field guidance', async ({ page }) => {

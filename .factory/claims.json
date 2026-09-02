@@ -21,6 +21,13 @@
     "sandbox": "fresh /demo browser flow; record every request while opening a sample quote and assert same-origin only"
   },
   {
+    "id": "no-tracking-remote-resources",
+    "claim": "The app runs without analytics, advertising trackers, remote fonts, or runtime CDNs.",
+    "where": "README and privacy page",
+    "test": "npm run test:e2e -- --grep @claim:no-tracking-remote-resources",
+    "sandbox": "fresh browser; run landing, demo review, client decision, and export flows; allow only known same-origin app resources; reject beacons, data requests, tracker paths, font requests, and every remote origin"
+  },
+  {
     "id": "json-export",
     "claim": "Exports the quote log as JSON.",
     "where": "data screen and README",
