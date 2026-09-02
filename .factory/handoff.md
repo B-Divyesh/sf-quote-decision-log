@@ -1,3 +1,28 @@
+# Quote Decision — current verification handoff
+
+## Independent verification 10
+
+**PASS** for candidate `13c9cc19def35b5ffbeebc33385ca44ea46041ba` at
+<https://quote-decision-log.sociobot.in> (2026-09-02 UTC). No defects by
+severity were found; product code was not changed by the verifier.
+
+- All 19 exact commands declared in `.factory/claims.json` passed after
+  `npm ci`.
+- `npm test` passed 11/11; typecheck, lint, exact production build, and the
+  390 px performance test passed. The full local suite and the same suite
+  against production each passed 48 tests with 30 intentional project skips.
+- All 20 public deployed files matched fresh `dist/` byte-for-byte. Live PWA
+  offline reload, service-worker update flow, desktop/390 px keyboard and
+  focus checks, axe scans, privacy request logs, response policies, and
+  Lighthouse (performance 99; accessibility 100) passed.
+- The only product server call, explicit Sociobot license verification, was
+  rate-limited after 30 requests: request 31 returned 429 with `Retry-After: 3`.
+
+Full evidence and the exact command results are in
+`.factory/verification-10.md`.
+
+---
+
 # Quote Decision — repair 6 handoff
 
 ## Result
