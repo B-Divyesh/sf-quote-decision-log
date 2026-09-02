@@ -1,0 +1,60 @@
+{
+  "home-1440x768.png": {
+    "viewport": {
+      "width": 1440,
+      "height": 768
+    },
+    "title": "Quote Decision — review quotes before sending",
+    "h1": 1,
+    "main": 1,
+    "facts": [
+      {
+        "text": "Stored in this browser",
+        "bottom": 645.609375
+      },
+      {
+        "text": "Works offline after the first visit",
+        "bottom": 645.609375
+      },
+      {
+        "text": "Five quotes free · $19 once for unlimited",
+        "bottom": 645.609375
+      }
+    ],
+    "scrollWidth": 1440,
+    "clientWidth": 1440,
+    "errors": [],
+    "origins": [
+      "https://quote-decision-log.sociobot.in"
+    ]
+  },
+  "home-390x844.png": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "title": "Quote Decision — review quotes before sending",
+    "h1": 1,
+    "main": 1,
+    "facts": [
+      {
+        "text": "Stored in this browser",
+        "bottom": 588.375
+      },
+      {
+        "text": "Works offline after the first visit",
+        "bottom": 612.375
+      },
+      {
+        "text": "Five quotes free · $19 once for unlimited",
+        "bottom": 636.375
+      }
+    ],
+    "scrollWidth": 390,
+    "clientWidth": 390,
+    "errors": [],
+    "origins": [
+      "https://quote-decision-log.sociobot.in"
+    ]
+  }
+}
