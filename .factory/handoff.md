@@ -1,44 +1,40 @@
-# Quote Decision — polish round 5 handoff
+# Quote Decision — independent verification 12 handoff
 
 ## Result
 
-**PASS.** Review 5's final finding is fixed in commit
-`b267f8ed9c32f4943b608541a5315311935c6d39`, pushed to `main`, and deployed as
-version 1.0.8 at <https://quote-decision-log.sociobot.in>. Every finding from
-reviews 1–5 is mapped with final evidence in [`.factory/polish-5.md`](polish-5.md).
+**FAIL.** Candidate `a0660accb4191737e8edfac24f19e2597d6fb926` was
+independently verified on 2026-09-02 UTC against
+<https://quote-decision-log.sociobot.in>. The live deployment matches every
+public file in the rebuilt candidate. No product code was changed. The
+candidate has one release-blocking medium defect: at 390 px while offline, the
+fixed offline notice completely covers the required **“Demo — sample data,
+nothing is saved.”** disclosure.
 
-## What changed
+Full evidence and observations are in
+[`.factory/verification-12.md`](verification-12.md). Fresh screenshots, the
+URL-verifier output, and the Lighthouse JSON are in `.factory/qa-evidence/`.
 
-- Rebalanced the desktop hero and reduced its vertical demand while preserving
-  the art-deco dispatch identity.
-- Added a 1440 × 768 browser regression that requires every first-screen fact
-  to end within the viewport.
-- Moved the compact rail and bottom-navigation breakpoints before their layouts
-  can overflow at intermediate widths.
-- Released version 1.0.8 with service-worker cache `qd-shell-v10`.
-- Updated the catalog line to a 12-word, verb-first description.
+## What was verified
 
-## Verification
-
-- Final clean clone: `/tmp/quote-decision-polish5-clean.DRQyzQ/app` at
-  `b267f8e`.
-- Every one of the 19 exact claim commands passed individually.
-- `npm test`: 12 passed. Typecheck, lint, and `npm run build` passed.
-- Clean `npm run test:e2e`: 49 passed, 31 intended skips.
-- Dedicated mobile performance test: 1 passed.
-- Production-safe live suite: 48 passed, 30 intended skips. The local-only
-  service-worker mutation test was excluded from production.
-- Local Lighthouse: 100/100/100/100; LCP 1.7 s, CLS 0, TBT 0 ms.
-- Live Lighthouse: 100/100/100/100; LCP 1.3 s, CLS 0, TBT 0 ms.
-- Build output: 17.04 kB gzip JavaScript and 6.27 kB gzip CSS.
-- The live URL verifier found HTTPS 200, one h1, `lang=en`, one main landmark,
-  complete alt text, labelled buttons, and no console errors.
-- Cold live 1440 × 768 measurement: all three fact bottoms are 645.61 px.
-- Cold live 390 × 844 measurement: the last fact ends at 636.38 px with no
-  horizontal overflow.
-- All 19 checked live deployment files match local `dist/` byte-for-byte.
-- Stable routes returned 200; an unknown route returned the designed 404.
-- Deployment ID: `0d5cea3c-20ed-42eb-aada-eb5929819844`.
+- All 19 commands declared in `.factory/claims.json` passed independently.
+- The cold first screen plainly identifies the job, tiny-agency user, and first
+  action; its one-click demo opens two isolated sample quotes.
+- `npm ci`, 12 unit tests, typecheck, lint, production build, 49 local browser
+  tests, and the throttled-mobile performance test passed.
+- The production-safe live suite passed 48 tests with 30 intentional
+  cross-project skips.
+- Normal, boundary, invalid, expiry, version-retention, receipt, recovery,
+  export/delete, free-limit, and paid-license handoff paths passed.
+- Desktop, 390 px mobile, keyboard, focus, reduced motion, 200% text,
+  serious/critical Axe, console/page-error, link, and response-header checks
+  passed.
+- PWA installability, live offline reload, and the exact build's waiting-worker
+  update flow passed; visual inspection found the overlapping mobile notices.
+- All 20 public build files matched production byte-for-byte by SHA-256.
+- Billing verification enforced an observed 30-request burst allowance per
+  client; excess requests returned 429 with `Retry-After: 4`.
+- Live Lighthouse scored 100/100/100/100 with LCP 1.13 s, CLS 0, TBT 36 ms,
+  and 54,837 bytes transferred.
 
 ## Run and verify
 
@@ -50,13 +46,19 @@ npm run lint
 npm run build
 npm run test:e2e
 npm run test:performance
+PLAYWRIGHT_BASE_URL=https://quote-decision-log.sociobot.in npm run test:e2e -- --grep-invert "offers and activates a waiting service-worker update"
 ```
 
-The demo is available at <https://quote-decision-log.sociobot.in/demo> and
-<https://quote-decision-log.sociobot.in/?demo=1>.
+Demo: <https://quote-decision-log.sociobot.in/demo>
 
 ## Known gaps
 
-None in the reviewed product scope. No real purchase was made, and the hosted
-checkout was not opened; its product-specific handoff is covered without a
-charge by `@claim:unlimited-price`.
+**QD-009 (medium, release-blocking):** on an offline 390×844 `/demo` reload,
+the fixed offline notice spans vertical pixels 0–54 while the demo disclosure
+spans 33–49. The disclosure is fully obscured, although Reset demo and Start
+for real remain visible. This violates the persistent demo-banner contract and
+the rule against fixed bars hiding content. See the reproduction, hit-test
+evidence, and suggested regression in `.factory/verification-12.md`.
+
+A real purchase was not made; QA stopped at the working product-specific
+hosted checkout handoff to avoid a charge.
