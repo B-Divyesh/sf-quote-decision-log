@@ -465,19 +465,39 @@ test('@claim:free-five-quotes applies the five-quote free allowance in the demo'
   await expect(page.getByText('DEMO LIMIT · 5/5')).toBeVisible();
 });
 
-test('@claim:offline-reload keeps the seeded demo usable offline after its first visit', async ({ browser }, testInfo) => {
-  test.skip(testInfo.project.name === 'mobile', 'The isolated context claim runs once in Chromium.');
-  const context = await browser.newContext();
+test('@claim:offline-reload keeps the 390px demo disclosure exposed offline at 200% text', async ({ browser }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'The isolated 390px context runs once in Chromium.');
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
   const page = await context.newPage();
   try {
+    const session = await context.newCDPSession(page);
+    await session.send('Emulation.setEmulatedOSTextScale', { scale: 2 });
     await resetDemo(page);
     await ensureServiceWorkerControl(page);
     await page.waitForFunction(async () => (await caches.keys()).some((key) => key.startsWith('qd-shell-')));
+    await page.waitForFunction(async () => Boolean(await caches.match('/demo')) && Boolean(await caches.match('/index.html')));
     await context.setOffline(true);
-    await page.goto('/demo#home');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.locator('.offline-banner')).toBeVisible();
+    await expect(page.getByLabel('Demo mode')).toContainText('Demo — sample data, nothing is saved.');
     await expect(page.getByRole('heading', { name: 'Quote log' })).toBeVisible();
     await expect(page.getByText('Cedar & Kite')).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const offline = document.querySelector<HTMLElement>('.offline-banner');
+      const disclosure = document.querySelector<HTMLElement>('.demo-banner span');
+      if (!offline || !disclosure) throw new Error('Offline notice or demo disclosure is missing.');
+      const notice = offline.getBoundingClientRect();
+      const demo = disclosure.getBoundingClientRect();
+      const topmost = document.elementFromPoint(demo.left + demo.width / 2, demo.top + demo.height / 2);
+      return {
+        noticeBottom: notice.bottom,
+        disclosureTop: demo.top,
+        disclosureIsTopmost: topmost?.closest('.demo-banner') === disclosure.closest('.demo-banner'),
+      };
+    });
+    expect(layout.disclosureTop).toBeGreaterThanOrEqual(layout.noticeBottom);
+    expect(layout.disclosureIsTopmost).toBe(true);
   } finally {
     await context.close();
   }

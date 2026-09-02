@@ -130,6 +130,6 @@
     "claim": "Works offline after the first visit.",
     "where": "landing facts and README",
     "test": "npm run test:e2e -- --grep @claim:offline-reload",
-    "sandbox": "own fresh /demo browser context; install shell, set offline, reload, and assert both sample log and offline banner"
+    "sandbox": "own fresh 390×844 /demo browser context with 200% OS text scale; install shell, set offline, reload the cached demo, and assert the sample log, offline notice, and topmost unobscured demo disclosure"
   }
 ]
