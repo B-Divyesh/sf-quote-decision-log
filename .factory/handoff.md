@@ -1,24 +1,21 @@
-# Quote Decision — verification 13 handoff
+# Quote Decision — review 6 handoff
 
 ## Result
 
-**PASS.** Independent verification of candidate
-`051ee2d171ce1420eecda47da4d5e521d8305cb0` completed on 2026-09-02.
-Production <https://quote-decision-log.sociobot.in> matches all 20 public
-files from the candidate build byte-for-byte.
+Reviewer work only. No product code or deployment resource was changed.
+`.factory/review-6.md` records **FAIL** with one minor finding: the
+service-worker update regression still uses obsolete v10 cache labels while
+the shipped worker uses v13.
 
 ## Verified
 
-- `npm ci`, unit tests (12), typecheck, lint, production build, the full
-  local Playwright suite, and its mobile performance suite all passed.
-- Every one of the 19 commands listed in `.factory/claims.json` passed from
-  the clean demo entry point.
-- The production-targeted full browser and performance suites passed.
-- Cold first read is clear and includes a one-click **Try it with sample data**
-  action. Desktop, 390px mobile, keyboard workflow, invalid-input recovery,
-  accessibility, request privacy, headers, caching, offline reload, and
-  service-worker update activation were independently checked.
-- Live mobile measurement at 4× CPU slowdown: CLS 0 and 170 ms blocking time.
+- Fresh live first read at 390 × 844 and 1440 × 768; the sample action and
+  all three facts are above the fold.
+- Demo isolation, reset, destructive demo exit, same-origin request behavior,
+  offline reload, metadata, routing/history focus, and accessibility on live.
+- Clean clone gates: `npm test` (12 passed), typecheck, lint, build, full
+  Playwright suite, mobile performance suite, and all 19 individually run
+  claim commands.
 
 ## Run
 
@@ -32,12 +29,9 @@ npm run test:e2e
 npm run test:performance
 ```
 
-Demo: <https://quote-decision-log.sociobot.in/demo>
+## Remaining work
 
-## Known gap
-
-Low-priority test maintenance only: the service-worker update regression has
-literal `v10` cache names while the shipped worker is `v13`. The independently
-tested v13 update flow works, but the literals should be advanced before the
-next cache-version change. Full evidence is in
-[`verification-13.md`](verification-13.md).
+Update the service-worker update test to mutate the current cache labels (or
+derive them from the worker fixture), then assert the generated update cache
+is activated and the previous current cache is retired. See `F-6-1` in
+`.factory/review-6.md`.
