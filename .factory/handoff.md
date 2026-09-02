@@ -2,9 +2,14 @@
 
 ## Result
 
-**PASS locally; ready for deployment.** This repair resolves QD-009 from
+**PASS and deployed.** This repair resolves QD-009 from
 independent verification 12 for candidate
 `a0660accb4191737e8edfac24f19e2597d6fb926`.
+
+Repair commit: `00768d2379cbd3b08b7aa83777340c16fb07c602`.
+It was deployed only to `sf-quote-decision-log` in resource group `sociobot`
+with `swa deploy ./dist --env production --resource-group sociobot --app-name
+sf-quote-decision-log --no-use-keychain`.
 
 At 390×844 with a 200% emulated OS text scale and a true offline `/demo`
 reload, the notice now occupies normal mobile document flow above the demo
@@ -52,6 +57,18 @@ Playwright Axe coverage passed with no serious or critical findings (3 passed,
 1 expected project skip). The full browser suite also rechecks desktop and
 390 px mobile flows, keyboard review, privacy/request policy, response policy,
 service-worker update, PWA offline behavior, and local data isolation.
+
+## Live deployment verification
+
+Production serves `qd-shell-v13`; its SHA-256 matches local `dist/sw.js`. All
+20 public build files matched production byte-for-byte. The live `/demo` URL
+verifier passed in 604 ms with no console or page errors and the same semantic
+baseline; evidence is in
+[`qa-evidence/repair-7/live-verify-url`](qa-evidence/repair-7/live-verify-url).
+The live production-safe browser suite passed 48 cases with 30 intentional
+project skips (the local-only waiting-worker update test is excluded). Live
+responses retain the configured CSP, Permissions-Policy, `no-referrer`, and
+`nosniff` policies.
 
 ## Run and deploy
 
