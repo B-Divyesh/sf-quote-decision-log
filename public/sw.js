@@ -1,5 +1,5 @@
-const VERSION = 'qd-shell-v9';
-const ASSET_CACHE = 'qd-assets-v9';
+const VERSION = 'qd-shell-v10';
+const ASSET_CACHE = 'qd-assets-v10';
 const SHELL = ['/', '/demo', '/index.html', '/offline.html', '/legal.css', '/manifest.webmanifest', '/icons/icon.svg', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png'];
 
 self.addEventListener('install', (event) => {

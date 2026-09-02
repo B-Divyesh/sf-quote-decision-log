@@ -78,7 +78,7 @@ exceeds 22 words, and no banned marketing term appears.
 
 | Words | Copy | Result |
 | ---: | --- | --- |
-| 13 | Review quotes before sending and keep a clear record of each client decision. | Pass |
+| 12 | Review quotes before sending, then record each client decision in the browser. | Pass |
 
 ## Offline fallback
 

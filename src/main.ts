@@ -108,7 +108,7 @@ function shell(content: string, section = 'home'): string {
     </header>
     <div id="offline-banner" class="offline-banner" ${navigator.onLine ? 'hidden' : ''}>Offline — changes stay here on this device.</div>
     <main id="main" tabindex="-1">${demoMode ? '<aside class="demo-banner" aria-label="Demo mode"><span><b>Demo</b> — sample data, nothing is saved.</span><button type="button" data-reset-demo>Reset demo</button><a href="/" data-start-real>Start for real</a></aside>' : ''}${content}</main>
-    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.7</span></footer>
+    <footer><span>Quote review and client decisions for tiny agencies.</span><span><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></span><span>Built by Param Factory · v1.0.8</span></footer>
     <div id="live" class="sr-only" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
   </div>`;

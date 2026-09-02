@@ -202,6 +202,21 @@ test('explains privacy, limits, and the complete price tier on the landing page'
   }
 });
 
+test('keeps every first-screen fact above the desktop fold', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'mobile', 'This regression uses the required 1440 × 768 desktop viewport.');
+  await page.setViewportSize({ width: 1440, height: 768 });
+  await page.goto('/');
+
+  const facts = page.locator('.plain-facts li');
+  await expect(facts).toHaveCount(3);
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  for (const fact of await facts.all()) {
+    const box = await fact.boundingBox();
+    expect(box, await fact.innerText()).not.toBeNull();
+    expect(box!.y + box!.height, await fact.innerText()).toBeLessThanOrEqual(viewportHeight);
+  }
+});
+
 test('has no serious accessibility findings on form, data, and legal screens', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'The mobile client screen is scanned in the lifecycle test.');
   for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/', '/offline.html', '/404.html']) {
@@ -377,13 +392,13 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   const original = await readFile(swPath, 'utf8');
   try {
     await ensureServiceWorkerControl(page);
-    await writeFile(swPath, original.replaceAll('qd-shell-v9', 'qd-shell-v9-regression').replaceAll('qd-assets-v9', 'qd-assets-v9-regression'));
+    await writeFile(swPath, original.replaceAll('qd-shell-v10', 'qd-shell-v10-regression').replaceAll('qd-assets-v10', 'qd-assets-v10-regression'));
     await page.evaluate(async () => { await navigator.serviceWorker.register(`/sw.js?update-test=${Date.now()}`); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
-    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v9-regression'));
+    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v10-regression'));
     await expect(page.getByRole('heading', { name: /Review quotes before you send them/i })).toBeVisible();
-    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v9'));
+    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v10'));
   } finally {
     await writeFile(swPath, original);
   }
