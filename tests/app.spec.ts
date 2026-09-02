@@ -390,15 +390,34 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   test.skip(testInfo.project.name === 'mobile', 'The update lifecycle is exercised once.');
   const swPath = new URL('../dist/sw.js', import.meta.url);
   const original = await readFile(swPath, 'utf8');
+  const readCacheLabel = (constant: 'VERSION' | 'ASSET_CACHE'): string => {
+    const match = original.match(new RegExp(`const ${constant} = '([^']+)';`));
+    if (!match) throw new Error(`The built service worker is missing ${constant}.`);
+    return match[1];
+  };
+  const currentShellCache = readCacheLabel('VERSION');
+  const currentAssetCache = readCacheLabel('ASSET_CACHE');
+  // This makes the fixture explicit: the release worker is v13. The labels are
+  // still read from the built worker so the mutation cannot silently target a
+  // stale literal when the next cache version is shipped.
+  expect(currentShellCache).toBe('qd-shell-v13');
+  expect(currentAssetCache).toBe('qd-assets-v13');
+  const updatedShellCache = `${currentShellCache}-regression`;
+  const updatedAssetCache = `${currentAssetCache}-regression`;
   try {
     await ensureServiceWorkerControl(page);
-    await writeFile(swPath, original.replaceAll('qd-shell-v10', 'qd-shell-v10-regression').replaceAll('qd-assets-v10', 'qd-assets-v10-regression'));
+    const updatedWorker = original
+      .replaceAll(currentShellCache, updatedShellCache)
+      .replaceAll(currentAssetCache, updatedAssetCache);
+    expect(updatedWorker).toContain(`const VERSION = '${updatedShellCache}';`);
+    expect(updatedWorker).toContain(`const ASSET_CACHE = '${updatedAssetCache}';`);
+    await writeFile(swPath, updatedWorker);
     await page.evaluate(async () => { await navigator.serviceWorker.register(`/sw.js?update-test=${Date.now()}`); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
-    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v10-regression'));
+    await page.waitForFunction(async (cacheName) => (await caches.keys()).includes(cacheName), updatedShellCache);
     await expect(page.getByRole('heading', { name: /Review quotes before you send them/i })).toBeVisible();
-    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v10'));
+    await page.waitForFunction(async (cacheName) => !(await caches.keys()).includes(cacheName), currentShellCache);
   } finally {
     await writeFile(swPath, original);
   }
