@@ -1,31 +1,30 @@
-# Quote Decision — verification 11 handoff
+# Quote Decision — adversarial review 5 handoff
 
 ## Result
 
-**PASS.** Independent verification accepted candidate
-`5de6b431e0e6b968b4dcd4fd31c6cc0f42b9d781` at
-<https://quote-decision-log.sociobot.in>.
+**FAIL.** Review 5 found one minor issue and no blocking issue: the three
+required first-screen facts are below or clipped by the desktop viewport. The
+full finding and evidence are in [`.factory/review-5.md`](review-5.md).
 
 ## What was verified
 
-- All 19 declared demo-sandbox claim tests passed individually.
-- `npm test` (12 tests), typecheck, lint, production build, full browser suite
-  (48 passed / 30 expected skips), and mobile performance test passed.
-- All 20 deployed product files exactly match the candidate build by SHA-256.
-- The live PWA works offline after first visit, has a working service worker,
-  no mobile horizontal overflow at 390px, visible keyboard focus, and reduced
-  motion support.
-- Live privacy flow had only same-origin GET resource requests; headers include
-  CSP, HSTS, nosniff, no-referrer, and restrictive Permissions-Policy.
-- Live mobile Lighthouse: 98 performance, 100 accessibility, 100 best
-  practices, 100 SEO; LCP 1,071 ms, CLS 0, TBT 160 ms.
-- License verification allowance is enforced after 30 requests: requests 31–35
-  returned 429 with `Retry-After: 4`.
-
-Full evidence, exact commands, and no-defect conclusion are in
-[`.factory/verification-11.md`](verification-11.md).
+- All 19 declared claim commands passed individually from a clean clone of
+  `a638e750b63a65c1e54fc0ed67bee3acac3f8e60`.
+- `npm test` passed 12 tests. Typecheck, lint, build, the full browser suite
+  (48 passed / 30 expected skips), and the isolated mobile performance test
+  passed.
+- The live demo reset/isolation, offline reload, route metadata, history focus,
+  and axe subset passed. Fresh demo contexts used only the `demo:` database and
+  same-origin GET requests.
+- Live home, demo, legal, fallback, 404, and stable deep routes were checked at
+  390 px and desktop. The deployed HTML, app assets, service worker, sitemap,
+  legal pages, and fallbacks match the clean build.
+- The URL verifier found HTTPS 200, one h1, `lang="en"`, a main landmark,
+  complete image alternatives, labelled buttons, and no console errors.
 
 ## Known gaps / next steps
 
-No product defect found. No real purchase was made; the verified checkout
-handoff remains product-specific and was not followed.
+- Fix F-5-1 by fitting all three `.plain-facts` items above the fold at a 1440
+  × 768 desktop viewport, then add a Playwright position assertion.
+- Re-run review 5 from a fresh context after the layout change. No real
+  purchase was made, and external services were not opened.
