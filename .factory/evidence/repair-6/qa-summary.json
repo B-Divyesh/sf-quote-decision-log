@@ -1,0 +1,64 @@
+{
+  "work_order": "quote-decision-log-repair-6",
+  "verified_at": "2026-09-02T01:27:40Z",
+  "code_commit": "c3bb4c2c9b49b2ab8ff1b81710adddefe8a25445",
+  "clean_install": {
+    "packages": 61,
+    "vulnerabilities": 0
+  },
+  "claims": {
+    "registered": 19,
+    "commands_run_separately": 19,
+    "passed": 19
+  },
+  "unit": {
+    "passed": 11,
+    "failed": 0
+  },
+  "local_e2e": {
+    "passed": 47,
+    "intentional_skips": 30,
+    "runner_flakes": 1,
+    "runner_flake_reason": "Chromium 1208 process SIGSEGV while creating the mobile context",
+    "exact_rerun_passed": 1
+  },
+  "live_e2e": {
+    "passed": 47,
+    "intentional_skips": 29,
+    "failed": 0,
+    "excluded": "The local service-worker file-mutation update test; it passed locally."
+  },
+  "license_return": {
+    "before_fix_live_retry_free": "1 passed, 2 failed",
+    "after_fix_live_retry_free": "3 passed, 0 failed",
+    "after_deploy_live_retry_free": "3 passed, 0 failed"
+  },
+  "bundle": {
+    "javascript_bytes": 55076,
+    "javascript_gzip_kb": 17.04,
+    "css_bytes": 24725,
+    "css_gzip_kb": 6.29,
+    "mobile_hero_bytes": 25958,
+    "desktop_hero_bytes": 47998
+  },
+  "lighthouse_local_median": {
+    "performance": 100,
+    "accessibility": 100,
+    "best_practices": 100,
+    "seo": 100,
+    "fcp_ms": 1055.558,
+    "lcp_ms": 1055.558,
+    "cls": 0,
+    "tbt_ms": 0
+  },
+  "lighthouse_live_median": {
+    "performance": 100,
+    "accessibility": 100,
+    "best_practices": 100,
+    "seo": 100,
+    "fcp_ms": 903.426,
+    "lcp_ms": 978.426,
+    "cls": 0,
+    "tbt_ms": 0
+  }
+}

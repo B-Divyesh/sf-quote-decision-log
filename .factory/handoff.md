@@ -1,39 +1,48 @@
-# Quote Decision — independent verification 9 handoff
+# Quote Decision — repair 6 handoff
 
 ## Result
 
-**FAIL.** Candidate `0384c20d42382593b791f0a5f317c2a5a694155d`
-was tested at <https://quote-decision-log.sociobot.in> on 2026-09-02 UTC.
+**PASS.** The three findings in independent verification report commit
+`999a50fc4969cb9c66f5f68da3b9acd7d0cd70a4` are repaired, covered by exact
+regressions, committed, pushed, and deployed.
 
-The deployed product matches the candidate byte-for-byte and its core quote,
-review, send, accept/decline, receipt, export/delete, mobile, accessibility,
-privacy, and offline flows work. Release acceptance is blocked because README
-makes a no-analytics/tracking/remote-resource claim that is not registered in
-`.factory/claims.json` and has no matching tagged test.
+- Work order: `quote-decision-log-repair-6`
+- Repaired code commit: `c3bb4c2c9b49b2ab8ff1b81710adddefe8a25445`
+- Product version: `1.0.6`
+- Production: <https://quote-decision-log.sociobot.in>
+- Deployment: `0f1b6dee-971d-4df6-8fe3-73fa4b59b12b`
+- Azure resource: `sf-quote-decision-log` in `sociobot`
 
-Detailed evidence: [`.factory/verification-9.md`](verification-9.md).
+## Repairs
 
-## Defects by severity
+1. Registered `no-tracking-remote-resources` in `.factory/claims.json` for the
+   README and privacy-page promise. Its one tagged test runs the landing,
+   isolated demo, sent-link, client consent receipt, and export flow. It rejects
+   every remote origin, non-GET data request, beacon call, font request,
+   tracker-like path, and same-origin resource outside the fixed app allowlist.
+2. Replaced `/offline.html` metaphors and jargon with “This page is not
+   available offline” and a direct reconnect instruction. It now uses the same
+   skip link, wordmark, four navigation links, legal links, footer, metadata,
+   stylesheet, focus treatment, and responsive chrome as the static routes.
+   `/legal.css` is precached in the new `qd-shell-v8` cache.
+3. Made license-return tests select `api.sociobot.in` on production and
+   `pilot-api.sociobot.in` elsewhere. The test now proves the expected token was
+   requested and waits for a valid, timestamped verification verdict instead
+   of accepting the optimistic first paint.
+4. Removed a separate demo claim-test race by waiting for Reset demo to finish
+   before writing the discard sample.
 
-- **High / release-blocking:** README lines 65–66 claim there are no analytics,
-  advertising trackers, remote fonts, or runtime CDNs. No claims entry or
-  `@claim:` test proves that statement. Manual inspection found it currently
-  true, but the supplied claims contract still requires FAIL.
-- **Medium:** `/offline.html` says “The app shell is between stations,” which
-  uses jargon and metaphor barred by the plain-words contract, and the route
-  omits the standard product header/footer.
-- **Low:** the license-return Playwright test always intercepts the pilot API.
-  Against production it misses the real API call and is timing-dependent.
+The required live license failure was reproduced before editing: three runs
+with retries disabled produced one pass and two failures at the missing
+“Unlimited is active” heading. The fixed test passed 3/3 against production
+before deployment and 3/3 again after deployment.
 
-Critical defects: 0. High: 1. Medium: 1. Low: 1. Product code was not changed.
+## Clean local verification
 
-## Verification summary
-
-From the exact candidate checkout:
+Run from `/work/repo`:
 
 ```sh
 npm ci
-# Every exact test command in .factory/claims.json (18 total)
 npm test
 npm run typecheck
 npm run lint
@@ -42,26 +51,66 @@ npm run test:e2e
 npm run test:performance
 ```
 
-- All 18 declared claim commands passed separately.
-- Unit tests passed 11/11; typecheck, lint, build, and performance passed.
-- Full local E2E exited zero: 44 passed, 29 intended skips, one transient
-  Chromium crash passed on retry; the exact case then passed 3/3.
-- Production build: 17.03 kB gzip JS, 6.29 kB gzip CSS.
-- Fresh live Lighthouse: 92 performance, 100 accessibility, 100 best
-  practices, 100 SEO; LCP 1.1 s and CLS 0.
-- Live axe found no serious/critical violations on the application, legal, and
-  404 screens. Keyboard, focus, 390 px reflow/targets, and reduced motion pass.
-- Live service worker controls the page; offline demo reload and cached sample
-  data pass. Local update activation passes.
-- All 20 public build files match fresh candidate `dist/` SHA-256 values.
-- Normal product flows made only same-origin requests. Security and cache
-  headers pass.
-- Billing verification enforces 30 requests per client window; request 31
-  returned 429 with `Retry-After: 4`.
-- No sign-in flow or product backend exists.
+- `npm ci`: 61 packages, 0 vulnerabilities.
+- Every one of the 19 `.factory/claims.json` commands was invoked separately;
+  all 19 passed.
+- Unit: 11/11 passed. Typecheck, lint, and production build passed.
+- Full E2E: 47 passed and 30 intended cross-project skips. Chromium 1208
+  crashed once while creating a mobile context; the configured runner retry
+  passed, and that exact target test then passed with retries disabled.
+- The stabilized demo claim passed 3/3 with retries disabled.
+- Mobile performance budget passed at 390×844 with 4× CPU slowdown.
+- Build output: 55,076-byte JS (17.04 kB gzip), 24,725-byte CSS (6.29 kB
+  gzip), 25,958-byte mobile hero, and 47,998-byte desktop hero.
+- Local URL checks on `/`, `/demo`, and `/offline.html`: HTTPS-equivalent 200,
+  zero console/page errors, title, `lang=en`, one h1, main landmark, complete
+  image alternatives, and labelled buttons.
+- Three local mobile Lighthouse runs: performance 100, accessibility 100,
+  best practices 100, SEO 100; median FCP/LCP 1.056 s, CLS 0, TBT 0.
 
-## Next steps
+The browser suite covers create/review/send/accept/decline, exact consent and
+fingerprints, receipt import/export, backup recovery, free limits, normal/demo
+storage isolation, deletion, desktop, 390 px mobile, keyboard focus, axe scans,
+offline reload/fallback, and service-worker update activation. Axe reports no
+serious or critical issues on app, legal, fallback, and 404 routes.
 
-Register and prove the unlisted README claim or remove it, repair the offline
-fallback copy/skeleton, make the license test choose the production API when
-appropriate, then repeat independent verification from the repaired commit.
+## Live verification
+
+- Deployment reused only `sf-quote-decision-log`; DNS and managed TLS were
+  already Ready. The public URL returned HTTPS 200 after upload.
+- Live E2E, excluding only the test that deliberately mutates the local
+  `dist/sw.js`, passed 47 with 29 intended skips and no failures. The update
+  lifecycle test passed locally against that mutable file.
+- Live URL checks on `/`, `/demo`, and `/offline.html` found zero console/page
+  errors and passed the baseline semantic checks.
+- Live installability: no manifest errors and no Chromium installability
+  errors. The page was service-worker controlled with `qd-shell-v8` present.
+- Reduced motion capped animation/transition duration at `0.00001` seconds.
+  The 390 px page had `scrollWidth = clientWidth = 390`. A 200% text check at
+  640 px had no overflow, retained the h1, and found no visible target below
+  44×44 px.
+- The new tracking/resource claim passed in the full live suite. Normal flows
+  used only allowlisted same-origin GET resources and no beacons, data calls,
+  font requests, analytics, advertising trackers, or runtime CDNs.
+- All 20 public build files matched local `dist/` byte-for-byte. The deployment
+  config is consumed by Static Web Apps and is intentionally not public.
+- Response policy: root and service worker use `no-cache`; hashed assets use
+  one-year immutable caching; CSP, HSTS, `nosniff`, no-referrer, and restrictive
+  Permissions-Policy headers are present. An unknown route returns the designed
+  page with HTTP 404.
+- Billing identity: the production checkout returned 303 to the hosted
+  checkout without being followed; a production invalid-license check returned
+  `{valid:false, reason:"invalid"}`.
+- Three live mobile Lighthouse runs: 100 in performance, accessibility, best
+  practices, and SEO; median FCP 0.903 s, LCP 0.978 s, CLS 0, TBT 0.
+
+Evidence is under [`.factory/evidence/repair-6`](evidence/repair-6), including
+local/live screenshots, URL reports, all six Lighthouse JSON reports, and the
+machine-readable QA and deployment summaries.
+
+## Known gaps and next steps
+
+No known product gap remains from verification 9. A paid transaction was not
+created; verification stopped at the live Sociobot checkout redirect. The
+occasional Chromium 1208 process crash is runner-level and recovered on retry;
+its exact affected test passed immediately in isolation.

@@ -1,0 +1,19 @@
+{
+  "deployed_at": "2026-09-02T01:21:44Z",
+  "resource": "sf-quote-decision-log",
+  "resource_group": "sociobot",
+  "deployment_id": "0f1b6dee-971d-4df6-8fe3-73fa4b59b12b",
+  "default_hostname": "green-desert-0d491e710.7.azurestaticapps.net",
+  "public_url": "https://quote-decision-log.sociobot.in",
+  "custom_domain_status": "Ready",
+  "https_status": 200,
+  "deployed_files_compared": 20,
+  "deployed_file_mismatches": 0,
+  "unknown_route_status": 404,
+  "checkout_status": 303,
+  "invalid_license_verdict": {
+    "valid": false,
+    "reason": "invalid",
+    "expires_at": null
+  }
+}
