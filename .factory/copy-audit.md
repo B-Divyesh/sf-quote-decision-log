@@ -74,6 +74,12 @@ exceeds 22 words, and no banned marketing term appears.
 | 1 | MIT. | Pass |
 | 2 | See LICENSE. | Pass |
 
+## Catalog description
+
+| Words | Copy | Result |
+| ---: | --- | --- |
+| 13 | Review quotes before sending and keep a clear record of each client decision. | Pass |
+
 ## Offline fallback
 
 | Words | Copy | Result |
