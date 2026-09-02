@@ -77,6 +77,7 @@ test('@claim:demo-sample-data opens an isolated sample log in one click', async 
   await page.getByRole('link', { name: 'Try demo' }).click();
   await expect(page).toHaveURL(/\/demo$/);
   await page.getByRole('button', { name: 'Reset demo' }).click();
+  await expect(page.locator('#toast')).toContainText('Demo reset with two sample quotes.');
   await addDemoQuote(page, 'QD-DISCARD');
   await page.goto('/demo');
   await page.getByRole('link', { name: /Website launch/ }).click();
