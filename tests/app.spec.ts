@@ -198,7 +198,7 @@ test('explains privacy, limits, and the complete price tier on the landing page'
 
 test('has no serious accessibility findings on form, data, and legal screens', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === 'mobile', 'The mobile client screen is scanned in the lifecycle test.');
-  for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/']) {
+  for (const path of ['/new', '/data', '/demo', '/privacy/', '/terms/', '/404.html']) {
     await page.goto(path);
     const results = await new AxeBuilder({ page: page as never }).analyze();
     expect(results.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')), path).toEqual([]);
