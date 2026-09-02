@@ -377,13 +377,13 @@ test('offers and activates a waiting service-worker update', async ({ page }, te
   const original = await readFile(swPath, 'utf8');
   try {
     await ensureServiceWorkerControl(page);
-    await writeFile(swPath, original.replaceAll('qd-shell-v8', 'qd-shell-v8-regression').replaceAll('qd-assets-v8', 'qd-assets-v8-regression'));
+    await writeFile(swPath, original.replaceAll('qd-shell-v9', 'qd-shell-v9-regression').replaceAll('qd-assets-v9', 'qd-assets-v9-regression'));
     await page.evaluate(async () => { await navigator.serviceWorker.register(`/sw.js?update-test=${Date.now()}`); });
     await expect(page.locator('#toast').getByText('A fresh version is ready.')).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Update now' }).click();
-    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v8-regression'));
+    await page.waitForFunction(async () => (await caches.keys()).includes('qd-shell-v9-regression'));
     await expect(page.getByRole('heading', { name: /Review quotes before you send them/i })).toBeVisible();
-    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v8'));
+    await page.waitForFunction(async () => !(await caches.keys()).includes('qd-shell-v9'));
   } finally {
     await writeFile(swPath, original);
   }

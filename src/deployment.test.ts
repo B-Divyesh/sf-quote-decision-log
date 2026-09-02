@@ -3,15 +3,34 @@ import { readFile } from 'node:fs/promises';
 import config from '../public/staticwebapp.config.json';
 import claims from '../.factory/claims.json';
 
+const siteOrigin = 'https://quote-decision-log.sociobot.in';
+const stablePublicPaths = ['/', '/demo', '/new', '/data', '/demo/new', '/demo/data', '/privacy/', '/terms/'];
+const stableAppPaths = ['/demo', '/new', '/data', '/demo/new', '/demo/data'];
+
 describe('static deployment policy', () => {
   it('ships manifest MIME, real app routes, a designed 404, immutable assets, and security policy', () => {
     expect(config.mimeTypes['.webmanifest']).toBe('application/manifest+json');
-    expect(config.routes.some((route) => route.route === '/demo' && route.rewrite === '/index.html')).toBe(true);
     expect(config.routes.some((route) => route.route === '/quote/*' && route.rewrite === '/index.html')).toBe(true);
     expect(config.responseOverrides?.['404']?.rewrite).toBe('/404.html');
     expect(config.routes.find((route) => route.route === '/assets/*')?.headers?.['Cache-Control']).toContain('immutable');
     expect(config.globalHeaders['Content-Security-Policy']).toContain("default-src 'self'");
     expect(config.globalHeaders['Permissions-Policy']).toContain('camera=()');
+  });
+
+  it('lists every stable public route in the sitemap and rewrites each stable app route exactly', async () => {
+    const sitemap = await readFile(new URL('../public/sitemap.xml', import.meta.url), 'utf8');
+    const sitemapPaths = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => {
+      const url = new URL(match[1]);
+      expect(url.origin).toBe(siteOrigin);
+      expect(url.search).toBe('');
+      expect(url.hash).toBe('');
+      return url.pathname;
+    });
+
+    expect(sitemapPaths).toEqual(stablePublicPaths);
+    for (const path of stableAppPaths) {
+      expect(config.routes.filter((route) => route.route === path && route.rewrite === '/index.html'), path).toHaveLength(1);
+    }
   });
 });
 
